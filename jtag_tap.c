@@ -148,23 +148,29 @@ static inline void jtag_pulse_clock(void)
     mpsse_send_byte(0);
 }
 
+uint8_t data[512];
+uint8_t* ptr;
+uint8_t rx_cnt;
+
+extern struct ftdi_context mpsse_ftdic;
+
 static inline uint8_t jtag_pulse_clock_and_read_tdo(bool tms, bool tdi)
 {
 	uint8_t ret;
+    *ptr++ = MC_DATA_TMS | MC_DATA_IN  | MC_DATA_LSB |  MC_DATA_BITS;
+	*ptr++ =  0;
 
-    mpsse_send_byte(MC_DATA_TMS | MC_DATA_IN  | MC_DATA_LSB |  MC_DATA_BITS);
-	mpsse_send_byte(0);
-
-    uint8_t data = 0;
+    uint8_t data0 = 0;
     if(tdi)
-        data |= 0x80;
+        data0 |= 0x80;
     if(tms)
-        data |= 0x01;
+        data0 |= 0x01;
         
-    mpsse_send_byte(data);
-	ret = mpsse_recv_byte();
+    *ptr++ = data0;
+	rx_cnt++;
+	//ret = mpsse_recv_byte();
     
-	return (ret >> 7) & 1;
+	//return (ret >> 7) & 1;
 }
 
 
@@ -175,51 +181,51 @@ void jtag_tap_shift(
 	bool must_end)
 {
 
-	
 
-	printf("jtag_tap_shift(%u)\n", data_bits);
+	mpsse_purge();
+
 	uint32_t bit_count = data_bits;
 	uint32_t byte_count = (data_bits + 7) / 8;
 
-	uint8_t byte_out = input_data[byte_count-1];
-	uint8_t tdo_byte = 0;
+	for (uint32_t i = 0; i < byte_count; ++i) {
+		uint8_t byte_out = input_data[i];
+		uint8_t tdo_byte = 0;
 
-
-	if(byte_count > 1){
-		mpsse_send_byte( MC_DATA_IN | MC_DATA_OUT | MC_DATA_LSB |MC_DATA_OCN);
-		mpsse_send_byte((byte_count - 2) & 0xFF);		
-		mpsse_send_byte((byte_count - 2) >> 8);	
-
-		for(int i = 0; i < byte_count-1; i++){				
-		mpsse_send_byte(input_data[i]);
-		output_data[i] = mpsse_recv_byte();
-		bit_count -= 8;
-		}
-
-	}
-
-	printf("loop2: %u \n", bit_count);
-	for (int j = 0; j < 8 && bit_count-- > 0; ++j) {
+		rx_cnt = 0;
+		ptr = data;
 		
-		bool tms = false;
-		bool tdi = false;
-		if (bit_count == 0 && must_end) {
-			tms = true;
-			jtag_state_ack(1);
+
+		for (int j = 0; j < 8 && bit_count-- > 0; ++j) {
+            bool tms = false;
+            bool tdi = false;
+			if (bit_count == 0 && must_end) {
+                tms = true;
+				jtag_state_ack(1);
+			}
+			if (byte_out & 1) {
+				tdi = true;
+			} else {
+				tdi = false;
+			}
+			byte_out >>= 1;
+			bool tdo = jtag_pulse_clock_and_read_tdo(tms, tdi);
+			tdo_byte |= tdo << j;
 		}
-		if (byte_out & 1) {
-			tdi = true;
-		} else {
-			tdi = false;
+		printf(" Tx: %u, Rx: %u\n", ptr-data, rx_cnt);
+		int rc = ftdi_write_data(&mpsse_ftdic, &data, ptr-data);
+		if (rc != (ptr-data)) {
+			fprintf(stderr, "Write error (single byte, rc=%d, expected %d).\n", rc, 1);
+			mpsse_error(2);
 		}
-		byte_out >>= 1;
-		bool tdo = jtag_pulse_clock_and_read_tdo(tms, tdi);
-		tdo_byte |= tdo << j;
-	
+
+
+		rc = ftdi_read_data(&mpsse_ftdic, &data, rx_cnt);
+		if (rc < 0) {
+			fprintf(stderr, "Read error.\n");
+			mpsse_error(2);
+		}
+		output_data[i] = data[rx_cnt-1];
 	}
-	output_data[byte_count-1] = tdo_byte;
-		
-	
 }
 
 void jtag_state_ack(bool tms)
