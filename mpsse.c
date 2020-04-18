@@ -108,6 +108,14 @@ void mpsse_send_byte(uint8_t data)
 	}
 }
 
+void mpsse_purge(void){
+	int rc = ftdi_usb_purge_buffers(&mpsse_ftdic);
+	if (rc != 0) {
+		fprintf(stderr, "Purge error.\n");
+		mpsse_error(2);
+	}
+}
+
 void mpsse_send_spi(uint8_t *data, int n)
 {
 	if (n < 1)
@@ -293,6 +301,12 @@ void mpsse_init(int ifnum, const char *devstr, bool slow_clock)
 		mpsse_send_byte(MC_SET_CLK_DIV);
 		mpsse_send_byte(0x00);
 		mpsse_send_byte(0x00);
+	}
+
+	int rc = ftdi_usb_purge_buffers(&mpsse_ftdic);
+	if (rc != 0) {
+		fprintf(stderr, "Purge error.\n");
+		mpsse_error(2);
 	}
 }
 

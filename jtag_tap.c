@@ -174,6 +174,7 @@ void jtag_tap_shift(
 	uint32_t data_bits,
 	bool must_end)
 {
+
 	uint32_t bit_count = data_bits;
 	uint32_t byte_count = (data_bits + 7) / 8;
 
@@ -225,9 +226,10 @@ void jtag_state_step(bool tms)
 
 void jtag_go_to_state(unsigned state)
 {
-    fprintf(stderr, " (%u) > (%u)\n", jtag_current_state() ,state);
+
+	mpsse_purge();
 	if (state == STATE_TEST_LOGIC_RESET) {
-		for (int i = 0; i < 5; ++i) {
+		for (int i = 0; i < 6; ++i) {
 			jtag_state_step(true);
 		}
 	} else {

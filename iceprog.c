@@ -175,10 +175,13 @@ static void flash_read_id()
 	if (verbose)
 		fprintf(stderr, "read flash ID..\n");
 
-	flash_chip_select();
+	//flash_chip_select();
 
 	// Write command and read first 4 bytes
-	mpsse_xfer_spi(data, len);
+	//mpsse_xfer_spi(data, len);
+	xfer_spi(data, len);
+	//jtag_go_to_state(STATE_SHIFT_DR);
+	//jtag_tap_shift(data, data, 8*5, false);
 
 	if (data[4] == 0xFF)
 		fprintf(stderr, "Extended Device String Length is 0xFF, "
@@ -187,11 +190,12 @@ static void flash_read_id()
 		// Read extended JEDEC ID bytes
 		if (data[4] != 0) {
 			len += data[4];
-			mpsse_xfer_spi(data + 5, len - 5);
+			data[0] = FC_JEDECID;
+			xfer_spi(data, len);
 		}
 	}
 
-	flash_chip_deselect();
+	//flash_chip_deselect();
 
 	// TODO: Add full decode of the JEDEC ID.
 	fprintf(stderr, "flash ID:");
@@ -203,35 +207,27 @@ static void flash_read_id()
 static void flash_reset()
 {
 	uint8_t data[8] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-
-	flash_chip_select();
-	mpsse_xfer_spi(data, 8);
-	flash_chip_deselect();
+	xfer_spi(data, 8);
 }
 
 static void flash_power_up()
 {
 	uint8_t data_rpd[1] = { FC_RPD };
-	flash_chip_select();
-	mpsse_xfer_spi(data_rpd, 1);
-	flash_chip_deselect();
+	xfer_spi(data_rpd, 1);
 }
 
 static void flash_power_down()
 {
 	uint8_t data[1] = { FC_PD };
-	flash_chip_select();
-	mpsse_xfer_spi(data, 1);
-	flash_chip_deselect();
+	jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data, data, 8, true);
 }
 
 static uint8_t flash_read_status()
 {
 	uint8_t data[2] = { FC_RSR1 };
 
-	flash_chip_select();
-	mpsse_xfer_spi(data, 2);
-	flash_chip_deselect();
+	xfer_spi(data, 2);
 
 	if (verbose) {
 		fprintf(stderr, "SR1: 0x%02X\n", data[1]);
@@ -473,17 +469,77 @@ static void read_idcode(){
 	jtag_tap_shift(data_in, data_out, 32, true);
 
 	uint32_t idcode = 0;
-
-
-
+	
 	for(int i = 0; i< 4; i++)
 		idcode = data_out[i] << 24 | idcode >> 8;
-
-	fprintf(stderr, "IDCODE: %08x\n", idcode);
 
 	print_idcode(idcode);
 }
 
+
+
+static void enter_spi_background_mode(){
+
+	uint8_t data_in[4] = {0,0,0,0};
+	uint8_t data_out[4] = {0,0,0,0};
+
+	data_in[0] = 0x3A;
+	jtag_go_to_state(STATE_SHIFT_IR);
+	jtag_tap_shift(data_in, data_out, 8, true);
+
+	/* These bytes seem to be required to un-lock the SPI interface */
+	data_in[0] = 0xFE;
+	data_in[1] = 0x68;
+	jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data_in, data_out, 16, true);
+
+	/* Entering IDLE is essential */
+	jtag_go_to_state(STATE_RUN_TEST_IDLE);
+
+}
+
+
+void ecp_jtag_cmd(uint8_t cmd){
+	uint8_t data_in[1] = {0};
+	uint8_t data_out[1] = {0};
+
+	data_in[0] = cmd;
+	jtag_go_to_state(STATE_SHIFT_IR);
+	jtag_tap_shift(data_in, data_out, 8, true);
+
+	jtag_go_to_state(STATE_RUN_TEST_IDLE);
+	jtag_wait_time(10);
+}
+
+
+uint8_t bit_reverse(uint8_t in){
+
+	uint8_t out =  (in & 0x01) ? 0x80 : 0x00;
+	        out |= (in & 0x02) ? 0x40 : 0x00;
+	        out |= (in & 0x04) ? 0x20 : 0x00;
+	        out |= (in & 0x08) ? 0x10 : 0x00;
+	        out |= (in & 0x10) ? 0x08 : 0x00;
+	        out |= (in & 0x20) ? 0x04 : 0x00;
+	        out |= (in & 0x40) ? 0x02 : 0x00;
+	        out |= (in & 0x80) ? 0x01 : 0x00;
+
+	return out;
+}
+
+void xfer_spi(uint8_t* data, uint32_t len){
+	/* Flip bit order of all bytes */
+	for(int i = 0; i < len; i++){
+		data[i] = bit_reverse(data[i]);
+	}
+
+	jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data, data, len * 8, true);
+
+	/* Flip bit order of all bytes */
+	for(int i = 0; i < len; i++){
+		data[i] = bit_reverse(data[i]);
+	}
+}
 
 // ---------------------------------------------------------
 // iceprog implementation
@@ -856,18 +912,41 @@ int main(int argc, char **argv)
 	fprintf(stderr, "init..\n");
 
 	mpsse_init(ifnum, devstr, slow_clock);
-
 	mpsse_jtag_init();
 
 	read_idcode();
 
+	/* Reset ECP5 to release SPI interface */
+	ecp_jtag_cmd(ISC_ENABLE);
+	ecp_jtag_cmd(ISC_ERASE);
+	ecp_jtag_cmd(ISC_DISABLE);
+
+	/* Put device into SPI bypass mode */
+	//ecp_jtag_cmd(0x3A);
+
+	enter_spi_background_mode();
+
+//	uint8_t data[1] = {0x3A};
+//	//
+//	jtag_go_to_state(STATE_SHIFT_IR);
+//	jtag_tap_shift(data, data, 8, true);
+//
+//	//jtag_wait_time(8);
+//
+//	//jtag_go_to_state(STATE_SHIFT_DR);
+//	uint8_t data_0[4] = {0x9F, 0, 0,0};
+//	//
+//	jtag_go_to_state(STATE_SHIFT_DR);
+//	jtag_tap_shift(data_0, data_0, 8*4, true);
 
 	//flash_release_reset();
-	usleep(100000);
+	usleep(2000);
 
 	if (test_mode)
 	{
+		flash_read_id();
 
+		flash_read_status();
 	}
 	else if (prog_sram)
 	{
@@ -1029,12 +1108,11 @@ int main(int argc, char **argv)
 		// Reset
 		// ---------------------------------------------------------
 
-		flash_power_down();
+		//flash_power_down();
 
-		set_cs_creset(1, 1);
 		usleep(250000);
 
-		fprintf(stderr, "cdone: %s\n", get_cdone() ? "high" : "low");
+		
 	}
 
 	if (f != NULL && f != stdin && f != stdout)
