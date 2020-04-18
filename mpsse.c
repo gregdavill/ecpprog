@@ -54,102 +54,49 @@ bool mpsse_ftdic_open = false;
 bool mpsse_ftdic_latency_set = false;
 unsigned char mpsse_ftdi_latency;
 
-
-enum jtag_states 
+/* Not sure if all of these are applicable to the JTAG interface */
+enum lattice_cmd
 {
-	JTAG_INVALID = 0,
-	JTAG_TEST_LOGIC_RESET,
-	JTAG_RUN_TEST_IDLE,
-	JTAG_SELECT_DR_SCAN,
-	JTAG_CAPTURE_DR,
-	JTAG_SHIFT_DR,
-	JTAG_EXIT_1_DR,
-	JTAG_PAUSE_DR,
-	JTAG_EXIT_2_DR,
-	JTAG_UPDATE_DR,
-	JTAG_SELECT_IR_SCAN,
-	JTAG_CAPTURE_IR,
-	JTAG_SHIFT_IR,
-	JTAG_EXIT_1_IR,
-	JTAG_PAUSE_IR,
-	JTAG_EXIT_2_IR,
-	JTAG_UPDATE_IR,
-};
-enum jtag_states jtag_state = JTAG_INVALID;
-
-/* MPSSE engine command definitions */
-enum mpsse_cmd
-{
-	/* Mode commands */
-	MC_SETB_LOW = 0x80, /* Set Data bits LowByte */
-	MC_READB_LOW = 0x81, /* Read Data bits LowByte */
-	MC_SETB_HIGH = 0x82, /* Set Data bits HighByte */
-	MC_READB_HIGH = 0x83, /* Read data bits HighByte */
-	MC_LOOPBACK_EN = 0x84, /* Enable loopback */
-	MC_LOOPBACK_DIS = 0x85, /* Disable loopback */
-	MC_SET_CLK_DIV = 0x86, /* Set clock divisor */
-	MC_FLUSH = 0x87, /* Flush buffer fifos to the PC. */
-	MC_WAIT_H = 0x88, /* Wait on GPIOL1 to go high. */
-	MC_WAIT_L = 0x89, /* Wait on GPIOL1 to go low. */
-	MC_TCK_X5 = 0x8A, /* Disable /5 div, enables 60MHz master clock */
-	MC_TCK_D5 = 0x8B, /* Enable /5 div, backward compat to FT2232D */
-	MC_EN_3PH_CLK = 0x8C, /* Enable 3 phase clk, DDR I2C */
-	MC_DIS_3PH_CLK = 0x8D, /* Disable 3 phase clk */
-	MC_CLK_N = 0x8E, /* Clock every bit, used for JTAG */
-	MC_CLK_N8 = 0x8F, /* Clock every byte, used for JTAG */
-	MC_CLK_TO_H = 0x94, /* Clock until GPIOL1 goes high */
-	MC_CLK_TO_L = 0x95, /* Clock until GPIOL1 goes low */
-	MC_EN_ADPT_CLK = 0x96, /* Enable adaptive clocking */
-	MC_DIS_ADPT_CLK = 0x97, /* Disable adaptive clocking */
-	MC_CLK8_TO_H = 0x9C, /* Clock until GPIOL1 goes high, count bytes */
-	MC_CLK8_TO_L = 0x9D, /* Clock until GPIOL1 goes low, count bytes */
-	MC_TRI = 0x9E, /* Set IO to only drive on 0 and tristate on 1 */
-	/* CPU mode commands */
-	MC_CPU_RS = 0x90, /* CPUMode read short address */
-	MC_CPU_RE = 0x91, /* CPUMode read extended address */
-	MC_CPU_WS = 0x92, /* CPUMode write short address */
-	MC_CPU_WE = 0x93, /* CPUMode write extended address */
+	ISC_NOOP = 0xFF, /* 0 bits - Non-operation */
+	READ_ID = 0xE0, /* 24 bits - Read out the 32-bit IDCODE of the device */
+	USERCODE = 0xC0, /* 24 bits - Read 32-bit usercode */
+	LSC_READ_STATUS = 0x3C, /* 24 bits - Read out internal status */
+	LSC_CHECK_BUSY = 0xF0, /* 24 bits - Read 1 bit busy flag to check the command execution status */
+	LSC_REFRESH = 0x79, /* 24 bits - Equivalent to toggle PROGRAMN pin */
+	ISC_ENABLE = 0xC6, /* 24 bits - Enable the Offline configuration mode */
+	ISC_ENABLE_X = 0x74, /* 24 bits - Enable the Transparent configuration mode */
+	ISC_DISABLE = 0x26, /* 24 bits - Disable the configuration operation */
+	ISC_PROGRAM_USERCODE = 0xC2, /* 24 bits - Write the 32-bit new USERCODE data to USERCODE register */
+	ISC_ERASE = 0x0E, /* 24 bits - Bulk erase the memory array base on the access mode and array selection */
+	ISC_PROGRAM_DONE = 0x5E, /* 24 bits - Program the DONE bit if the device is in Configuration state. */
+	ISC_PROGRAM_SECURITY = 0xCE, /* 24 bits - Program the Security bit if the device is in Configuration state */
+	LSC_INIT_ADDRESS = 0x46, /* 24 bits - Initialize the Address Shift Register */
+	LSC_WRITE_ADDRESS = 0xB4, /* 24 bits - Write the 16 bit Address Register to move the address quickly */
+	LSC_BITSTREAM_BURST = 0x7A, /* 24 bits - Program the device the whole bitstream sent in as the command operand */
+	LSC_PROG_INCR_RTI = 0x82, /* 24 bits - Write configuration data to the configuration memory frame at current address and post increment the address, Byte 2~0 of the opcode indicate number of the frames included in the operand field */
+	LSC_PROG_INCR_ENC = 0xB6, /* 24 bits - Encrypt the configuration data then write */
+	LSC_PROG_INCR_CMP = 0xB8, /* 24 bits - Decompress the configuration data, then write */
+	LSC_PROG_INCR_CNE = 0xBA, /* 24 bits - Decompress and Encrypt the configuration data, then write */
+	LSC_VERIFY_INCR_RTI = 0x6A, /* 24 bits - Read back the configuration memory frame selected by the address register and post increment the address */
+	LSC_PROG_CTRL0 = 0x22, /* 24 bits - Modify the Control Register 0 */
+	LSC_READ_CTRL0 = 0x20, /* 24 bits - Read the Control Register 0 */
+	LSC_RESET_CRC = 0x3B, /* 24 bits - Reset 16-bit frame CRC register to 0x0000 */
+	LSC_READ_CRC = 0x60, /* 24 bits - Read 16-bit frame CRC register content */
+	LSC_PROG_SED_CRC = 0xA2, /* 24 bits - Program the calculated 32-bit CRC based on configuration bit values only into overall CRC register */
+	LSC_READ_SED_CRC = 0xA4, /* 24 bits - Read the 32-bit SED CRC */
+	LSC_PROG_PASSWORD = 0xF1, /* 24 bits - Program 64-bit password into the non-volatile memory (Efuse) */
+	LSC_READ_PASSWORD = 0xF2, /* 24 bits - Read out the 64-bit password before activated for verification */
+	LSC_SHIFT_PASSWORD = 0xBC, /* 24 bits - Shift in the password to unlock for re-configuration (necessary when password protection feature is active). */
+	LSC_PROG_CIPHER_KEY = 0xF3, /* 24 bits - Program the 128-bit cipher key into Efuse */
+	LSC_READ_CIPHER_KEY = 0xF4, /* 24 bits - Read out the 128-bit cipher key before activated for verification */
+	LSC_PROG_FEATURE = 0xE4, /* 24 bits - Program User Feature, such as Customer ID, I2C Slave Address, Unique ID Header */
+	LSC_READ_FEATURE = 0xE7, /* 24 bits - Read User Feature, such as Customer ID, I2C Slave Address, Unique ID Header */
+	LSC_PROG_FEABITS = 0xF8, /* 24 bits - Program User Feature Bits, such as CFG port and pin persistence, PWD_EN, PWD_ALL, DEC_ONLY, Feature Row Lock etc. */
+	LSC_READ_FEABITS = 0xFB, /* 24 bits - Read User Feature Bits, such as CFH port and pin persistence, PWD_EN, PWD_ALL, DEC_ONLY, Feature Row Lock etc. */
+	LSC_PROG_OTP = 0xF9, /* 24 bits - Program OTP bits, to set Memory Sectors One Time Programmable */
+	LSC_READ_OTP = 0xFA, /* 24 bits - Read OTP bits setting */
 };
 
-/* Transfer Command bits */
-
-/* All byte based commands consist of:
- * - Command byte
- * - Length lsb
- * - Length msb
- *
- * If data out is enabled the data follows after the above command bytes,
- * otherwise no additional data is needed.
- * - Data * n
- *
- * All bit based commands consist of:
- * - Command byte
- * - Length
- *
- * If data out is enabled a byte containing bitst to transfer follows.
- * Otherwise no additional data is needed. Only up to 8 bits can be transferred
- * per transaction when in bit mode.
- */
-
-/* b 0000 0000
- *   |||| |||`- Data out negative enable. Update DO on negative clock edge.
- *   |||| ||`-- Bit count enable. When reset count represents bytes.
- *   |||| |`--- Data in negative enable. Latch DI on negative clock edge.
- *   |||| `---- LSB enable. When set clock data out LSB first.
- *   ||||
- *   |||`------ Data out enable
- *   ||`------- Data in enable
- *   |`-------- TMS mode enable
- *   `--------- Special command mode enable. See mpsse_cmd enum.
- */
-
-#define MC_DATA_TMS  (0x40) /* When set use TMS mode */
-#define MC_DATA_IN   (0x20) /* When set read data (Data IN) */
-#define MC_DATA_OUT  (0x10) /* When set write data (Data OUT) */
-#define MC_DATA_LSB  (0x08) /* When set input/output data LSB first. */
-#define MC_DATA_ICN  (0x04) /* When set receive data on negative clock edge */
-#define MC_DATA_BITS (0x02) /* When set count bits not bytes */
-#define MC_DATA_OCN  (0x01) /* When set update data on negative clock edge */
 
 // ---------------------------------------------------------
 // MPSSE / FTDI function implementations
@@ -299,64 +246,13 @@ void mpsse_jtag_init(){
 	mpsse_send_byte(0x0B); /* Direction */
 
 	/* Reset JTAG State machine */
-	mpsse_jtag_tms(6, 0b111111);
-
-	jtag_state = JTAG_TEST_LOGIC_RESET;
+	jtag_init();
 }
 
 void mpsse_jtag_tms(uint8_t bits, uint8_t pattern){
-	mpsse_send_byte(MC_DATA_TMS | MC_DATA_IN | MC_DATA_LSB | MC_DATA_BITS);
+	mpsse_send_byte(MC_DATA_TMS | MC_DATA_LSB | MC_DATA_BITS);
 	mpsse_send_byte(bits-1);
 	mpsse_send_byte(pattern);
-}
-
-void mpsse_jtag_idcode(){
-	mpsse_send_byte(MC_SETB_LOW);
-	mpsse_send_byte(0x08); /* Value */
-	mpsse_send_byte(0x0B); /* Direction */
-
-	/* Reset JTAG State machine */
-	mpsse_jtag_tms(6, 0b000000);
-	mpsse_jtag_tms(6, 0b000000);
-
-	jtag_state = JTAG_TEST_LOGIC_RESET;
-}
-
-void mpsse_jtag_scan_dr(uint16_t len, uint8_t* data_out){
-	uint8_t data;
-	enter_jtag_state_shift_dr();
-
-	mpsse_send_byte(MC_DATA_IN | MC_DATA_LSB);
-	mpsse_send_byte(4);
-		data = mpsse_recv_byte();
-		data = mpsse_recv_byte();
-	
-	uint32_t idcode = 0;
-
-	for(int i = 0; i < 4; i++)
-	{
-		mpsse_send_byte(0);
-		idcode = mpsse_recv_byte() << 24 | idcode >> 8;
-	}	
-
-	fprintf(stderr, "idcode: 0x%08x\n", idcode);
-
-	mpsse_jtag_tms(6, 0b111111);
-
-	
-}
-
-void enter_jtag_state_shift_dr(){
-	switch(jtag_state){
-		case JTAG_TEST_LOGIC_RESET:
-			mpsse_jtag_tms(4, 0b0010);
-			break;
-
-		default:
-		case JTAG_INVALID:
-			fprintf(stderr, "JTAG statemachine in INVALID State\n");
-			break;
-	}
 }
 
 void mpsse_init(int ifnum, const char *devstr, bool slow_clock)

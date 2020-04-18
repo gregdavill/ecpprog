@@ -41,6 +41,7 @@
 #endif
 
 #include "mpsse.h"
+#include "jtag.h"
 
 static bool verbose = false;
 
@@ -820,10 +821,24 @@ int main(int argc, char **argv)
 
 	mpsse_jtag_init();
 
-	mpsse_jtag_scan_dr();
+	jtag_go_to_state(STATE_SHIFT_IR);
 
-	//fprintf(stderr, "cdone: %s\n", get_cdone() ? "high" : "low");
+	uint8_t data_in[4] = {0,0,0,0};
+	uint8_t data_out[4] = {0,0,0,0};
 
+	data_in[0] = 0xE0;
+	jtag_tap_shift(data_in, data_out, 8, true);
+	fprintf(stderr, " %02x\n", data_out[0]);
+
+	jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data_in, data_out, 32, true);
+
+
+	fprintf(stderr, "Data: ");
+	for(int i = 0; i< 4; i++)
+		fprintf(stderr, " %02x", data_out[i]);
+	fprintf(stderr, "\n");
+	
 	//flash_release_reset();
 	usleep(100000);
 

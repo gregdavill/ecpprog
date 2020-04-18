@@ -50,7 +50,7 @@ endif
 
 all: $(PROGRAM_PREFIX)iceprog$(EXE)
 
-$(PROGRAM_PREFIX)iceprog$(EXE): iceprog.o mpsse.o
+$(PROGRAM_PREFIX)iceprog$(EXE): iceprog.o mpsse.o jtag_tap.o
 	$(CC) -o $@ $(LDFLAGS) $^ $(LDLIBS)
 
 install: all
