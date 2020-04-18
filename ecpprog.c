@@ -463,7 +463,7 @@ static void print_status_register(uint32_t status){
 
 	if(verbose){
 		printf("  Transparent Mode:   %s\n",  status & (1 << 0)  ? "Yes" : "No" );
-		printf("  Config Target:      %s\n",  status & (7 << 1)  ? "SRAM" : "eFuse" );
+		printf("  Config Target:      %s\n",  status & (7 << 1)  ? "eFuse" : "SRAM" );
 		printf("  JTAG Active:        %s\n",  status & (1 << 4)  ? "Yes" : "No" );
 		printf("  PWD Protection:     %s\n",  status & (1 << 5)  ? "Yes" : "No" );
 		printf("  Decrypt Enable:     %s\n",  status & (1 << 7)  ? "Yes" : "No" );
