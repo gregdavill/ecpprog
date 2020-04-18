@@ -186,13 +186,13 @@ void jtag_tap_shift(
 
 	uint32_t bit_count = data_bits;
 	uint32_t byte_count = (data_bits + 7) / 8;
+	rx_cnt = 0;
+	ptr = data;
 
 	for (uint32_t i = 0; i < byte_count; ++i) {
 		uint8_t byte_out = input_data[i];
 		uint8_t tdo_byte = 0;
 
-		rx_cnt = 0;
-		ptr = data;
 		
 
 		for (int j = 0; j < 8 && bit_count-- > 0; ++j) {
@@ -211,21 +211,22 @@ void jtag_tap_shift(
 			bool tdo = jtag_pulse_clock_and_read_tdo(tms, tdi);
 			tdo_byte |= tdo << j;
 		}
-		printf(" Tx: %u, Rx: %u\n", ptr-data, rx_cnt);
-		int rc = ftdi_write_data(&mpsse_ftdic, &data, ptr-data);
-		if (rc != (ptr-data)) {
-			fprintf(stderr, "Write error (single byte, rc=%d, expected %d).\n", rc, 1);
-			mpsse_error(2);
-		}
 
 
-		rc = ftdi_read_data(&mpsse_ftdic, &data, rx_cnt);
-		if (rc < 0) {
-			fprintf(stderr, "Read error.\n");
-			mpsse_error(2);
-		}
-		output_data[i] = data[rx_cnt-1];
 	}
+	printf(" Tx: %u, Rx: %u\n", ptr-data, rx_cnt);
+	int rc = ftdi_write_data(&mpsse_ftdic, &data, ptr-data);
+	if (rc != (ptr-data)) {
+		fprintf(stderr, "Write error (single byte, rc=%d, expected %d).\n", rc, 1);
+		mpsse_error(2);
+	}
+	rc = ftdi_read_data(&mpsse_ftdic, &data, rx_cnt);
+	if (rc < 0) {
+		fprintf(stderr, "Read error.\n");
+		mpsse_error(2);
+	}
+	for(int i = 0; i < rx_cnt/8; i++)
+		output_data[i] = data[7+i*8];
 }
 
 void jtag_state_ack(bool tms)
