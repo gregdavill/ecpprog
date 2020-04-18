@@ -94,70 +94,8 @@ enum flash_cmd {
 };
 
 // ---------------------------------------------------------
-// Hardware specific CS, CReset, CDone functions
-// ---------------------------------------------------------
-
-static void set_cs_creset(int cs_b, int creset_b)
-{
-	uint8_t gpio = 0;
-	uint8_t direction = 0x93;
-
-	if (cs_b) {
-		// ADBUS4 (GPIOL0)
-		gpio |= 0x10;
-	}
-
-	if (creset_b) {
-		// ADBUS7 (GPIOL3)
-		gpio |= 0x80;
-	}
-
-	mpsse_set_gpio(gpio, direction);
-}
-
-static bool get_cdone(void)
-{
-	// ADBUS6 (GPIOL2)
-	return (mpsse_readb_low() & 0x40) != 0;
-}
-
-// ---------------------------------------------------------
 // FLASH function implementations
 // ---------------------------------------------------------
-
-// the FPGA reset is released so also FLASH chip select should be deasserted
-static void flash_release_reset()
-{
-	set_cs_creset(1, 1);
-}
-
-// FLASH chip select assert
-// should only happen while FPGA reset is asserted
-static void flash_chip_select()
-{
-	set_cs_creset(0, 0);
-}
-
-// FLASH chip select deassert
-static void flash_chip_deselect()
-{
-	set_cs_creset(1, 0);
-}
-
-// SRAM reset is the same as flash_chip_select()
-// For ease of code reading we use this function instead
-static void sram_reset()
-{
-	// Asserting chip select and reset lines
-	set_cs_creset(0, 0);
-}
-
-// SRAM chip select assert
-// When accessing FPGA SRAM the reset should be released
-static void sram_chip_select()
-{
-	set_cs_creset(0, 1);
-}
 
 static void flash_read_id()
 {
@@ -197,7 +135,7 @@ static void flash_read_id()
 		}
 	}
 
-	//flash_chip_deselect();
+	////flash_chip_deselect();
 
 	// TODO: Add full decode of the JEDEC ID.
 	fprintf(stderr, "flash ID:");
@@ -290,9 +228,9 @@ static void flash_write_enable()
 		fprintf(stderr, "write enable..\n");
 
 	uint8_t data[1] = { FC_WE };
-	flash_chip_select();
+	//flash_chip_select();
 	mpsse_xfer_spi(data, 1);
-	flash_chip_deselect();
+	//flash_chip_deselect();
 
 	if (verbose) {
 		fprintf(stderr, "status after enable:\n");
@@ -305,9 +243,9 @@ static void flash_bulk_erase()
 	fprintf(stderr, "bulk erase..\n");
 
 	uint8_t data[1] = { FC_CE };
-	flash_chip_select();
+	//flash_chip_select();
 	mpsse_xfer_spi(data, 1);
-	flash_chip_deselect();
+	//flash_chip_deselect();
 }
 
 static void flash_4kB_sector_erase(int addr)
@@ -316,9 +254,9 @@ static void flash_4kB_sector_erase(int addr)
 
 	uint8_t command[4] = { FC_SE, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
-	flash_chip_select();
+	//flash_chip_select();
 	mpsse_send_spi(command, 4);
-	flash_chip_deselect();
+	//flash_chip_deselect();
 }
 
 static void flash_32kB_sector_erase(int addr)
@@ -327,9 +265,9 @@ static void flash_32kB_sector_erase(int addr)
 
 	uint8_t command[4] = { FC_BE32, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
-	flash_chip_select();
+	//flash_chip_select();
 	mpsse_send_spi(command, 4);
-	flash_chip_deselect();
+	//flash_chip_deselect();
 }
 
 static void flash_64kB_sector_erase(int addr)
@@ -338,9 +276,9 @@ static void flash_64kB_sector_erase(int addr)
 
 	uint8_t command[4] = { FC_BE64, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
-	flash_chip_select();
+	//flash_chip_select();
 	mpsse_send_spi(command, 4);
-	flash_chip_deselect();
+	//flash_chip_deselect();
 }
 
 static void flash_prog(int addr, uint8_t *data, int n)
@@ -350,10 +288,10 @@ static void flash_prog(int addr, uint8_t *data, int n)
 
 	uint8_t command[4] = { FC_PP, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
-	flash_chip_select();
+	//flash_chip_select();
 	mpsse_send_spi(command, 4);
 	mpsse_send_spi(data, n);
-	flash_chip_deselect();
+	//flash_chip_deselect();
 
 	if (verbose)
 		for (int i = 0; i < n; i++)
@@ -367,11 +305,11 @@ static void flash_read(int addr, uint8_t *data, int n)
 
 	uint8_t command[4] = { FC_RD, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
-	flash_chip_select();
+	//flash_chip_select();
 	mpsse_send_spi(command, 4);
 	memset(data, 0, n);
 	mpsse_xfer_spi(data, n);
-	flash_chip_deselect();
+	//flash_chip_deselect();
 
 	if (verbose)
 		for (int i = 0; i < n; i++)
@@ -388,9 +326,9 @@ static void flash_wait()
 	{
 		uint8_t data[2] = { FC_RSR1 };
 
-		flash_chip_select();
+		//flash_chip_select();
 		mpsse_xfer_spi(data, 2);
-		flash_chip_deselect();
+		//flash_chip_deselect();
 
 		if ((data[1] & 0x01) == 0) {
 			if (count < 2) {
@@ -428,23 +366,65 @@ static void flash_disable_protection()
 
 	// Write Status Register 1 <- 0x00
 	uint8_t data[2] = { FC_WSR1, 0x00 };
-	flash_chip_select();
+	//flash_chip_select();
 	mpsse_xfer_spi(data, 2);
-	flash_chip_deselect();
+	//flash_chip_deselect();
 	
 	flash_wait();
 	
 	// Read Status Register 1
 	data[0] = FC_RSR1;
 
-	flash_chip_select();
+	//flash_chip_select();
 	mpsse_xfer_spi(data, 2);
-	flash_chip_deselect();
+	//flash_chip_deselect();
 
 	if (data[1] != 0x00)
 		fprintf(stderr, "failed to disable protection, SR now equal to 0x%02x (expected 0x00)\n", data[1]);
 
 }
+
+// ---------------------------------------------------------
+// JTAG -> SPI functions
+// ---------------------------------------------------------
+
+/* 
+ * JTAG performrs all shifts LSB first, our FLSAH is expeting bytes MSB first,
+ * There are a few ways to fix this, for now we just bit-reverse all the input data to the JTAG core
+ */
+uint8_t bit_reverse(uint8_t in){
+
+	uint8_t out =  (in & 0x01) ? 0x80 : 0x00;
+	        out |= (in & 0x02) ? 0x40 : 0x00;
+	        out |= (in & 0x04) ? 0x20 : 0x00;
+	        out |= (in & 0x08) ? 0x10 : 0x00;
+	        out |= (in & 0x10) ? 0x08 : 0x00;
+	        out |= (in & 0x20) ? 0x04 : 0x00;
+	        out |= (in & 0x40) ? 0x02 : 0x00;
+	        out |= (in & 0x80) ? 0x01 : 0x00;
+
+	return out;
+}
+
+void xfer_spi(uint8_t* data, uint32_t len){
+	/* Flip bit order of all bytes */
+	for(int i = 0; i < len; i++){
+		data[i] = bit_reverse(data[i]);
+	}
+
+	jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data, data, len * 8, true);
+
+	/* Flip bit order of all bytes */
+	for(int i = 0; i < len; i++){
+		data[i] = bit_reverse(data[i]);
+	}
+}
+
+// ---------------------------------------------------------
+// ECP5 specific JTAG functions
+// ---------------------------------------------------------
+
 
 static void print_idcode(uint32_t idcode){
 	for(int i = 0; i < sizeof(ecp_devices)/sizeof(struct ecp_device_id); i++){
@@ -459,21 +439,20 @@ static void print_idcode(uint32_t idcode){
 
 static void read_idcode(){
 
-	uint8_t data_in[4] = {0,0,0,0};
-	uint8_t data_out[4] = {0,0,0,0};
+	uint8_t data[4] = {READ_ID};
 
-	data_in[0] = READ_ID;
 	jtag_go_to_state(STATE_SHIFT_IR);
-	jtag_tap_shift(data_in, data_out, 8, true);
+	jtag_tap_shift(data, data, 8, true);
 
-	data_in[0] = 0;
+	data[0] = 0;
 	jtag_go_to_state(STATE_SHIFT_DR);
-	jtag_tap_shift(data_in, data_out, 32, true);
+	jtag_tap_shift(data, data, 32, true);
 
 	uint32_t idcode = 0;
 	
+	/* Format the IDCODE into a 32bit value */
 	for(int i = 0; i< 4; i++)
-		idcode = data_out[i] << 24 | idcode >> 8;
+		idcode = data[i] << 24 | idcode >> 8;
 
 	print_idcode(idcode);
 }
@@ -511,36 +490,6 @@ void ecp_jtag_cmd(uint8_t cmd){
 
 	jtag_go_to_state(STATE_RUN_TEST_IDLE);
 	jtag_wait_time(10);
-}
-
-
-uint8_t bit_reverse(uint8_t in){
-
-	uint8_t out =  (in & 0x01) ? 0x80 : 0x00;
-	        out |= (in & 0x02) ? 0x40 : 0x00;
-	        out |= (in & 0x04) ? 0x20 : 0x00;
-	        out |= (in & 0x08) ? 0x10 : 0x00;
-	        out |= (in & 0x10) ? 0x08 : 0x00;
-	        out |= (in & 0x20) ? 0x04 : 0x00;
-	        out |= (in & 0x40) ? 0x02 : 0x00;
-	        out |= (in & 0x80) ? 0x01 : 0x00;
-
-	return out;
-}
-
-void xfer_spi(uint8_t* data, uint32_t len){
-	/* Flip bit order of all bytes */
-	for(int i = 0; i < len; i++){
-		data[i] = bit_reverse(data[i]);
-	}
-
-	jtag_go_to_state(STATE_SHIFT_DR);
-	jtag_tap_shift(data, data, len * 8, true);
-
-	/* Flip bit order of all bytes */
-	for(int i = 0; i < len; i++){
-		data[i] = bit_reverse(data[i]);
-	}
 }
 
 // ---------------------------------------------------------
@@ -940,13 +889,11 @@ int main(int argc, char **argv)
 
 		fprintf(stderr, "reset..\n");
 
-		sram_reset();
+		//sram_reset();
 		usleep(100);
 
-		sram_chip_select();
+		//sram_chip_select();
 		usleep(2000);
-
-		fprintf(stderr, "cdone: %s\n", get_cdone() ? "high" : "low");
 
 
 		// ---------------------------------------------------------
@@ -967,7 +914,7 @@ int main(int argc, char **argv)
 		mpsse_send_dummy_bytes(6);
 		mpsse_send_dummy_bit();
 
-		fprintf(stderr, "cdone: %s\n", get_cdone() ? "high" : "low");
+		
 	}
 	else /* program flash */
 	{
@@ -977,10 +924,10 @@ int main(int argc, char **argv)
 
 		fprintf(stderr, "reset..\n");
 
-		flash_chip_deselect();
+		//flash_chip_deselect();
 		usleep(250000);
 
-		fprintf(stderr, "cdone: %s\n", get_cdone() ? "high" : "low");
+		
 
 		flash_reset();
 		flash_power_up();
