@@ -42,6 +42,7 @@
 
 #include "mpsse.h"
 #include "jtag.h"
+#include "lattice_cmds.h"
 
 static bool verbose = false;
 
@@ -447,6 +448,43 @@ static void flash_disable_protection()
 
 }
 
+static void print_idcode(uint32_t idcode){
+	for(int i = 0; i < sizeof(ecp_devices)/sizeof(struct ecp_device_id); i++){
+		if(idcode == ecp_devices[i].device_id)
+		{
+			printf("IDCODE: 0x%08x (%s)\n", idcode ,ecp_devices[i].device_name);
+			return;
+		}
+	}
+	printf("IDCODE: 0x%08x does not match :(\n", idcode);
+}
+
+static void read_idcode(){
+
+	uint8_t data_in[4] = {0,0,0,0};
+	uint8_t data_out[4] = {0,0,0,0};
+
+	data_in[0] = READ_ID;
+	jtag_go_to_state(STATE_SHIFT_IR);
+	jtag_tap_shift(data_in, data_out, 8, true);
+
+	data_in[0] = 0;
+	jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data_in, data_out, 32, true);
+
+	uint32_t idcode = 0;
+
+
+
+	for(int i = 0; i< 4; i++)
+		idcode = data_out[i] << 24 | idcode >> 8;
+
+	fprintf(stderr, "IDCODE: %08x\n", idcode);
+
+	print_idcode(idcode);
+}
+
+
 // ---------------------------------------------------------
 // iceprog implementation
 // ---------------------------------------------------------
@@ -821,24 +859,9 @@ int main(int argc, char **argv)
 
 	mpsse_jtag_init();
 
-	jtag_go_to_state(STATE_SHIFT_IR);
-
-	uint8_t data_in[4] = {0,0,0,0};
-	uint8_t data_out[4] = {0,0,0,0};
-
-	data_in[0] = 0xE0;
-	jtag_tap_shift(data_in, data_out, 8, true);
-	fprintf(stderr, " %02x\n", data_out[0]);
-
-	jtag_go_to_state(STATE_SHIFT_DR);
-	jtag_tap_shift(data_in, data_out, 32, true);
+	read_idcode();
 
 
-	fprintf(stderr, "Data: ");
-	for(int i = 0; i< 4; i++)
-		fprintf(stderr, " %02x", data_out[i]);
-	fprintf(stderr, "\n");
-	
 	//flash_release_reset();
 	usleep(100000);
 
