@@ -458,6 +458,74 @@ static void read_idcode(){
 }
 
 
+static void print_status_register(uint32_t status){	
+	printf("ECP5 Status Register: 0x%08x\n", status);
+
+	if(verbose){
+		printf("  Transparent Mode:   %s\n",  status & (1 << 0)  ? "Yes" : "No" );
+		printf("  Config Target:      %s\n",  status & (7 << 1)  ? "SRAM" : "eFuse" );
+		printf("  JTAG Active:        %s\n",  status & (1 << 4)  ? "Yes" : "No" );
+		printf("  PWD Protection:     %s\n",  status & (1 << 5)  ? "Yes" : "No" );
+		printf("  Decrypt Enable:     %s\n",  status & (1 << 7)  ? "Yes" : "No" );
+		printf("  DONE:               %s\n",  status & (1 << 8)  ? "Yes" : "No" );
+		printf("  ISC Enable:         %s\n",  status & (1 << 9)  ? "Yes" : "No" );
+		printf("  Write Enable:       %s\n",  status & (1 << 10) ? "Writable" : "Not Writable");
+		printf("  Read Enable:        %s\n",  status & (1 << 11) ? "Readable" : "Not Readable");
+		printf("  Busy Flag:          %s\n",  status & (1 << 12) ? "Yes" : "No" );
+		printf("  Fail Flag:          %s\n",  status & (1 << 13) ? "Yes" : "No" );
+		printf("  Feature OTP:        %s\n",  status & (1 << 14) ? "Yes" : "No" );
+		printf("  Decrypt Only:       %s\n",  status & (1 << 15) ? "Yes" : "No" );
+		printf("  PWD Enable:         %s\n",  status & (1 << 16) ? "Yes" : "No" );
+		printf("  Encrypt Preamble:   %s\n",  status & (1 << 20) ? "Yes" : "No" );
+		printf("  Std Preamble:       %s\n",  status & (1 << 21) ? "Yes" : "No" );
+		printf("  SPIm Fail 1:        %s\n",  status & (1 << 22) ? "Yes" : "No" );
+		
+		uint8_t bse_error = (status & (7 << 23)) >> 23;
+		switch (bse_error){
+			case 0b000: printf("  BSE Error Code:     No Error (0b000)\n"); break;
+			case 0b001: printf("  BSE Error Code:     ID Error (0b001)\n"); break;
+			case 0b010: printf("  BSE Error Code:     CMD Error - illegal command (0b010)\n"); break;
+			case 0b011: printf("  BSE Error Code:     CRC Error (0b011)\n"); break;
+			case 0b100: printf("  BSE Error Code:     PRMB Error - preamble error (0b100)\n"); break;
+			case 0b101: printf("  BSE Error Code:     ABRT Error - configuration aborted by the user (0b101)\n"); break;
+			case 0b110: printf("  BSE Error Code:     OVFL Error - data overflow error (0b110)\n"); break;
+			case 0b111: printf("  BSE Error Code:     SDM Error - bitstream pass the size of SRAM array (0b111)\n"); break;
+		}
+
+		printf("  Execution Error:    %s\n",  status & (1 << 26) ? "Yes" : "No" );
+		printf("  ID Error:           %s\n",  status & (1 << 27) ? "Yes" : "No" );
+		printf("  Invalid Command:    %s\n",  status & (1 << 28) ? "Yes" : "No" );
+		printf("  SED Error:          %s\n",  status & (1 << 29) ? "Yes" : "No" );
+		printf("  Bypass Mode:        %s\n",  status & (1 << 30) ? "Yes" : "No" );
+		printf("  Flow Througuh Mode: %s\n",  status & (1 << 31) ? "Yes" : "No" );
+
+	}
+
+
+}
+
+
+static void read_status_register(){
+
+	uint8_t data[4] = {LSC_READ_STATUS};
+
+	jtag_go_to_state(STATE_SHIFT_IR);
+	jtag_tap_shift(data, data, 8, true);
+
+	data[0] = 0;
+	jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data, data, 32, true);
+
+	uint32_t status = 0;
+	
+	/* Format the IDCODE into a 32bit value */
+	for(int i = 0; i< 4; i++)
+		status = data[i] << 24 | status >> 8;
+
+	print_status_register(status);
+}
+
+
 
 static void enter_spi_background_mode(){
 
@@ -476,7 +544,6 @@ static void enter_spi_background_mode(){
 
 	/* Entering IDLE is essential */
 	jtag_go_to_state(STATE_RUN_TEST_IDLE);
-
 }
 
 
@@ -866,6 +933,7 @@ int main(int argc, char **argv)
 	mpsse_jtag_init();
 
 	read_idcode();
+	read_status_register();
 
 	/* Reset ECP5 to release SPI interface */
 	ecp_jtag_cmd(ISC_ENABLE);
