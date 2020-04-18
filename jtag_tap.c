@@ -175,30 +175,51 @@ void jtag_tap_shift(
 	bool must_end)
 {
 
+	
+
+	printf("jtag_tap_shift(%u)\n", data_bits);
 	uint32_t bit_count = data_bits;
 	uint32_t byte_count = (data_bits + 7) / 8;
 
-	for (uint32_t i = 0; i < byte_count; ++i) {
-		uint8_t byte_out = input_data[i];
-		uint8_t tdo_byte = 0;
-		for (int j = 0; j < 8 && bit_count-- > 0; ++j) {
-            bool tms = false;
-            bool tdi = false;
-			if (bit_count == 0 && must_end) {
-                tms = true;
-				jtag_state_ack(1);
-			}
-			if (byte_out & 1) {
-				tdi = true;
-			} else {
-				tdi = false;
-			}
-			byte_out >>= 1;
-			bool tdo = jtag_pulse_clock_and_read_tdo(tms, tdi);
-			tdo_byte |= tdo << j;
+	uint8_t byte_out = input_data[byte_count-1];
+	uint8_t tdo_byte = 0;
+
+
+	if(byte_count > 1){
+		mpsse_send_byte( MC_DATA_IN | MC_DATA_OUT | MC_DATA_LSB |MC_DATA_OCN);
+		mpsse_send_byte((byte_count - 2) & 0xFF);		
+		mpsse_send_byte((byte_count - 2) >> 8);	
+
+		for(int i = 0; i < byte_count-1; i++){				
+		mpsse_send_byte(input_data[i]);
+		output_data[i] = mpsse_recv_byte();
+		bit_count -= 8;
 		}
-		output_data[i] = tdo_byte;
+
 	}
+
+	printf("loop2: %u \n", bit_count);
+	for (int j = 0; j < 8 && bit_count-- > 0; ++j) {
+		
+		bool tms = false;
+		bool tdi = false;
+		if (bit_count == 0 && must_end) {
+			tms = true;
+			jtag_state_ack(1);
+		}
+		if (byte_out & 1) {
+			tdi = true;
+		} else {
+			tdi = false;
+		}
+		byte_out >>= 1;
+		bool tdo = jtag_pulse_clock_and_read_tdo(tms, tdi);
+		tdo_byte |= tdo << j;
+	
+	}
+	output_data[byte_count-1] = tdo_byte;
+		
+	
 }
 
 void jtag_state_ack(bool tms)
