@@ -498,10 +498,7 @@ static void print_status_register(uint32_t status){
 		printf("  SED Error:          %s\n",  status & (1 << 29) ? "Yes" : "No" );
 		printf("  Bypass Mode:        %s\n",  status & (1 << 30) ? "Yes" : "No" );
 		printf("  Flow Througuh Mode: %s\n",  status & (1 << 31) ? "Yes" : "No" );
-
 	}
-
-
 }
 
 
@@ -936,6 +933,11 @@ int main(int argc, char **argv)
 
 		/* Put device into SPI bypass mode */
 		enter_spi_background_mode();
+
+		usleep(20000);
+		flash_reset();
+
+		usleep(20000);
 
 		flash_read_id();
 	}

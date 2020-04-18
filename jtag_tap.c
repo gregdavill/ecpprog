@@ -213,29 +213,48 @@ void jtag_state_ack(bool tms)
 void jtag_state_step(bool tms)
 {
     
-    mpsse_send_byte(MC_DATA_TMS | MC_DATA_LSB | MC_DATA_BITS);
-	mpsse_send_byte(0);
+    //mpsse_send_byte(MC_DATA_TMS | MC_DATA_LSB | MC_DATA_BITS);
+	//mpsse_send_byte(0);
 	if (tms) {
-    	mpsse_send_byte(1);
+    //	mpsse_send_byte(1);
 	} else {
-        mpsse_send_byte(0);
+    //    mpsse_send_byte(0);
 	}
     
 	jtag_state_ack(tms);
 }
 
+
+uint8_t bit_reverse(uint8_t);
+
 void jtag_go_to_state(unsigned state)
 {
-
 	mpsse_purge();
+
 	if (state == STATE_TEST_LOGIC_RESET) {
-		for (int i = 0; i < 6; ++i) {
+		for (int i = 0; i < 5; ++i) {
 			jtag_state_step(true);
 		}
+		mpsse_send_byte(MC_DATA_TMS | MC_DATA_LSB | MC_DATA_BITS);
+		mpsse_send_byte(5 - 1);
+		mpsse_send_byte(0b11111);
+		
 	} else {
+		uint8_t d = 0;
+		uint8_t count = 0;
 		while (jtag_current_state() != state) {
+			d = (d >> 1) & ~0x80;
+			if((tms_map[jtag_current_state()] >> state) & 1){
+				d |= 0x80;
+			}
+			count++;
+
 			jtag_state_step((tms_map[jtag_current_state()] >> state) & 1);
 		}
+		mpsse_send_byte(MC_DATA_TMS | MC_DATA_LSB | MC_DATA_BITS);
+		mpsse_send_byte(count - 1);
+		mpsse_send_byte(d >> (8-count));
+		
 	}
 }
 
