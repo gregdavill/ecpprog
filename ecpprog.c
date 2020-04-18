@@ -565,7 +565,7 @@ void ecp_jtag_cmd(uint8_t cmd){
 
 static void help(const char *progname)
 {
-	fprintf(stderr, "Simple programming tool for FTDI-based Lattice iCE programmers.\n");
+	fprintf(stderr, "Simple programming tool for FTDI-based Lattice ECP JTAG programmers.\n");
 	fprintf(stderr, "Usage: %s [-b|-n|-c] <input file>\n", progname);
 	fprintf(stderr, "       %s -r|-R<bytes> <output file>\n", progname);
 	fprintf(stderr, "       %s -S <input file>\n", progname);
@@ -620,20 +620,8 @@ static void help(const char *progname)
 	fprintf(stderr, "    iCE FTDI USB device),\n");
 	fprintf(stderr, "  3 if verification of the data failed.\n");
 	fprintf(stderr, "\n");
-	fprintf(stderr, "Notes for iCEstick (iCE40HX-1k devel board):\n");
-	fprintf(stderr, "  An unmodified iCEstick can only be programmed via the serial flash.\n");
-	fprintf(stderr, "  Direct programming of the SRAM is not supported. For direct SRAM\n");
-	fprintf(stderr, "  programming the flash chip and one zero ohm resistor must be desoldered\n");
-	fprintf(stderr, "  and the FT2232H SI pin must be connected to the iCE SPI_SI pin, as shown\n");
-	fprintf(stderr, "  in this picture:\n");
-	fprintf(stderr, "  http://www.clifford.at/gallery/2014-elektronik/IMG_20141115_183838\n");
-	fprintf(stderr, "\n");
-	fprintf(stderr, "Notes for the iCE40-HX8K Breakout Board:\n");
-	fprintf(stderr, "  Make sure that the jumper settings on the board match the selected\n");
-	fprintf(stderr, "  mode (SRAM or FLASH). See the iCE40-HX8K user manual for details.\n");
-	fprintf(stderr, "\n");
 	fprintf(stderr, "If you have a bug report, please file an issue on github:\n");
-	fprintf(stderr, "  https://github.com/cliffordwolf/icestorm/issues\n");
+	fprintf(stderr, "  https://github.com/gregdavill/ecpprog/issues\n");
 }
 
 int main(int argc, char **argv)
@@ -935,18 +923,20 @@ int main(int argc, char **argv)
 	read_idcode();
 	read_status_register();
 
-	/* Reset ECP5 to release SPI interface */
-	ecp_jtag_cmd(ISC_ENABLE);
-	ecp_jtag_cmd(ISC_ERASE);
-	ecp_jtag_cmd(ISC_DISABLE);
-
-	/* Put device into SPI bypass mode */
-	enter_spi_background_mode();
-
 	usleep(20000);
 
 	if (test_mode)
 	{
+
+
+		/* Reset ECP5 to release SPI interface */
+		ecp_jtag_cmd(ISC_ENABLE);
+		ecp_jtag_cmd(ISC_ERASE);
+		ecp_jtag_cmd(ISC_DISABLE);
+
+		/* Put device into SPI bypass mode */
+		enter_spi_background_mode();
+
 		flash_read_id();
 	}
 	else if (prog_sram)

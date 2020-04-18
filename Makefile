@@ -48,21 +48,21 @@ LDLIBS += $(shell for pkg in libftdi1 libftdi; do $(PKG_CONFIG) --silence-errors
 CFLAGS += $(shell for pkg in libftdi1 libftdi; do $(PKG_CONFIG) --silence-errors --cflags $$pkg && exit; done; )
 endif
 
-all: $(PROGRAM_PREFIX)iceprog$(EXE)
+all: $(PROGRAM_PREFIX)ecpprog$(EXE)
 
-$(PROGRAM_PREFIX)iceprog$(EXE): iceprog.o mpsse.o jtag_tap.o
+$(PROGRAM_PREFIX)ecpprog$(EXE): ecpprog.o mpsse.o jtag_tap.o
 	$(CC) -o $@ $(LDFLAGS) $^ $(LDLIBS)
 
 install: all
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
-	cp $(PROGRAM_PREFIX)iceprog$(EXE) $(DESTDIR)$(PREFIX)/bin/$(PROGRAM_PREFIX)iceprog$(EXE)
+	cp $(PROGRAM_PREFIX)ecpprog$(EXE) $(DESTDIR)$(PREFIX)/bin/$(PROGRAM_PREFIX)ecpprog$(EXE)
 
 uninstall:
-	rm -f $(DESTDIR)$(PREFIX)/bin/$(PROGRAM_PREFIX)iceprog$(EXE)
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(PROGRAM_PREFIX)ecpprog$(EXE)
 
 clean:
-	rm -f $(PROGRAM_PREFIX)iceprog
-	rm -f $(PROGRAM_PREFIX)iceprog.exe
+	rm -f $(PROGRAM_PREFIX)ecpprog
+	rm -f $(PROGRAM_PREFIX)ecpprog.exe
 	rm -f *.o *.d
 
 -include *.d
