@@ -1,8 +1,10 @@
 /*
- *  iceprog -- simple programming tool for FTDI-based Lattice iCE programmers
+ *  ecpprog -- simple programming tool for FTDI-based JTAG programmers
+ *  Based on iceprog
  *
  *  Copyright (C) 2015  Clifford Wolf <clifford@clifford.at>
  *  Copyright (C) 2018  Piotr Esden-Tempski <piotr@esden.net>
+ *  Copyright (C) 2020  Gregory Davill <greg.davill@gmail.com>
  *
  *  Permission to use, copy, modify, and/or distribute this software for any
  *  purpose with or without fee is hereby granted, provided that the above
@@ -922,31 +924,13 @@ int main(int argc, char **argv)
 	ecp_jtag_cmd(ISC_DISABLE);
 
 	/* Put device into SPI bypass mode */
-	//ecp_jtag_cmd(0x3A);
-
 	enter_spi_background_mode();
 
-//	uint8_t data[1] = {0x3A};
-//	//
-//	jtag_go_to_state(STATE_SHIFT_IR);
-//	jtag_tap_shift(data, data, 8, true);
-//
-//	//jtag_wait_time(8);
-//
-//	//jtag_go_to_state(STATE_SHIFT_DR);
-//	uint8_t data_0[4] = {0x9F, 0, 0,0};
-//	//
-//	jtag_go_to_state(STATE_SHIFT_DR);
-//	jtag_tap_shift(data_0, data_0, 8*4, true);
-
-	//flash_release_reset();
-	usleep(2000);
+	usleep(20000);
 
 	if (test_mode)
 	{
 		flash_read_id();
-
-		flash_read_status();
 	}
 	else if (prog_sram)
 	{
