@@ -133,7 +133,6 @@ void xfer_spi(uint8_t* data, uint32_t len){
 }
 
 void send_spi(uint8_t* data, uint32_t len){
-	uint8_t unused[len];
 	
 	/* Flip bit order of all bytes */
 	for(int i = 0; i < len; i++){
@@ -142,8 +141,14 @@ void send_spi(uint8_t* data, uint32_t len){
 
 	jtag_go_to_state(STATE_SHIFT_DR);
 	/* Stay in SHIFT-DR state, this keep CS low */
-	jtag_tap_shift(data, unused, len * 8, false); 
+	jtag_tap_shift(data, data, len * 8, false); 
+
+		/* Flip bit order of all bytes */
+	for(int i = 0; i < len; i++){
+		data[i] = bit_reverse(data[i]);
+	}
 }
+
 
 // ---------------------------------------------------------
 // FLASH function implementations
@@ -309,6 +314,30 @@ static void flash_prog(int addr, uint8_t *data, int n)
 
 	send_spi(command, 4);
 	xfer_spi(data, n);
+	
+	if (verbose)
+		for (int i = 0; i < n; i++)
+			fprintf(stderr, "%02x%c", data[i], i == n - 1 || i % 32 == 31 ? '\n' : ' ');
+}
+
+
+static void flash_start_read(int addr)
+{
+	if (verbose)
+		fprintf(stderr, "Start Read 0x%06X\n", addr);
+
+	uint8_t command[4] = { FC_RD, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
+
+	send_spi(command, 4);
+}
+
+static void flash_continue_read(uint8_t *data, int n)
+{
+	if (verbose)
+		fprintf(stderr, "Contiune Read +0x%03X..\n", n);
+
+	memset(data, 0, n);
+	send_spi(data, n);
 	
 	if (verbose)
 		for (int i = 0; i < n; i++)
@@ -1039,10 +1068,12 @@ int main(int argc, char **argv)
 
 		if (read_mode) {
 			fprintf(stderr, "reading..\n");
-			for (int addr = 0; addr < read_size; addr += 256) {
-				uint8_t buffer[256];
-				flash_read(rw_offset + addr, buffer, 256);
-				fwrite(buffer, read_size - addr > 256 ? 256 : read_size - addr, 1, f);
+
+			flash_start_read(rw_offset);
+			for (int addr = 0; addr < read_size; addr += 4096) {
+				uint8_t buffer[4096];
+				flash_continue_read(buffer, 4096);
+				fwrite(buffer, read_size - addr > 4096 ? 4096 : read_size - addr, 1, f);
 			}
 		} else if (!erase_mode && !disable_verify) {
 			fprintf(stderr, "reading..\n");

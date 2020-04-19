@@ -6,6 +6,7 @@
  */
 
 #include <ftdi.h>
+#include <string.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -145,7 +146,7 @@ extern struct ftdi_context mpsse_ftdic;
 
 static inline void jtag_pulse_clock_and_read_tdo(bool tms, bool tdi)
 {
-    *ptr++ = MC_DATA_TMS | MC_DATA_IN | MC_DATA_LSB | MC_DATA_BITS;
+    *ptr++ = MC_DATA_TMS | MC_DATA_IN | MC_DATA_LSB | MC_DATA_BITS | MC_DATA_OCN;
 	*ptr++ =  0;        
     *ptr++ = (tdi ? 0x80 : 0) | (tms ? 0x01 : 0);
 	rx_cnt++;
@@ -185,6 +186,34 @@ static void _jtag_tap_shift(
 		output_data[i] = data[7+i*8];
 }
 
+
+static void jtag_shift_bytes(
+	uint8_t *input_data,
+	uint8_t *output_data,
+	uint32_t data_bits,
+	bool must_end)
+{
+
+	/* Sanity check */
+	if(data_bits % 8 != 0){
+		printf("Error %u is not a byte multiple\n", data_bits);
+	}
+	//printf("jtag_shift_bytes(0x%08x,0x%08x,%u,%s);\n",input_data, output_data, data_bits, must_end ? "true" : "false");
+	uint32_t byte_count = data_bits / 8;
+
+
+
+	data[0] = MC_DATA_OUT | MC_DATA_IN | MC_DATA_LSB | MC_DATA_OCN;
+	data[1] = (byte_count - 1); 
+	data[2] = (byte_count - 1) >> 8;        
+	memcpy(data + 3, input_data, byte_count);
+
+	mpsse_xfer(data, byte_count + 3, byte_count);
+
+	memcpy(output_data, data, byte_count);
+}
+
+
 #define MIN(a,b) (a < b) ? a : b
 
 void jtag_tap_shift(
@@ -193,19 +222,35 @@ void jtag_tap_shift(
 	uint32_t data_bits,
 	bool must_end)
 {
+	/* if 'must_end' the send last byte seperately 
+	 * This way we toggle TMS on the last clock cycle */
+	if(must_end)
+		data_bits -= 8;
+	
 	uint32_t data_bits_sent = 0;
-	while(data_bits_sent != data_bits){
+	if(data_bits){
+		while(data_bits_sent != data_bits){
 
-		uint32_t _data_bits = MIN(256, data_bits);
-		bool last = (data_bits_sent + _data_bits) == data_bits;
+			uint32_t _data_bits = MIN(4096 + 2048 + 1024, data_bits - data_bits_sent);
 
+			jtag_shift_bytes(
+				input_data + data_bits_sent/8,
+				output_data + data_bits_sent/8,
+				_data_bits,
+				false
+			);
+			data_bits_sent += _data_bits;
+		}
+	}
+
+	/* Send our last byte */
+	if(must_end){
 		_jtag_tap_shift(
 			input_data + data_bits_sent/8,
 			output_data + data_bits_sent/8,
-			_data_bits,
-			last & must_end
+			8,
+			must_end
 		);
-		data_bits_sent += _data_bits;
 	}
 }
 

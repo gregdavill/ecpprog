@@ -221,15 +221,17 @@ void mpsse_init(int ifnum, const char *devstr, bool slow_clock)
 		mpsse_error(2);
 	}
 
+	mpsse_send_byte(MC_TCK_X5);
+
 	if (slow_clock) {
 		// set 50 kHz clock
 		mpsse_send_byte(MC_SET_CLK_DIV);
-		mpsse_send_byte(119);
+		mpsse_send_byte(29);
 		mpsse_send_byte(0x00);
 	} else {
 		// set 6 MHz clock
 		mpsse_send_byte(MC_SET_CLK_DIV);
-		mpsse_send_byte(4);
+		mpsse_send_byte(1);
 		mpsse_send_byte(0x00);
 	}
 
