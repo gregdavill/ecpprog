@@ -103,6 +103,7 @@ enum mpsse_cmd
 void mpsse_check_rx(void);
 void mpsse_error(int status);
 uint8_t mpsse_recv_byte(void);
+void mpsse_xfer(uint8_t* data_buffer, uint16_t send_length, uint16_t receive_length);
 void mpsse_send_byte(uint8_t data);
 void mpsse_send_spi(uint8_t *data, int n);
 void mpsse_xfer_spi(uint8_t *data, int n);

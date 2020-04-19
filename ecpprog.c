@@ -42,7 +42,6 @@
 #include <fcntl.h> /* _O_BINARY */
 #endif
 
-#include "mpsse.h"
 #include "jtag.h"
 #include "lattice_cmds.h"
 
@@ -93,6 +92,59 @@ enum flash_cmd {
 	FC_RESET = 0x99, /* Reset Device */
 };
 
+
+// ---------------------------------------------------------
+// JTAG -> SPI functions
+// ---------------------------------------------------------
+
+/* 
+ * JTAG performrs all shifts LSB first, our FLSAH is expeting bytes MSB first,
+ * There are a few ways to fix this, for now we just bit-reverse all the input data to the JTAG core
+ */
+uint8_t bit_reverse(uint8_t in){
+
+	uint8_t out =  (in & 0x01) ? 0x80 : 0x00;
+	        out |= (in & 0x02) ? 0x40 : 0x00;
+	        out |= (in & 0x04) ? 0x20 : 0x00;
+	        out |= (in & 0x08) ? 0x10 : 0x00;
+	        out |= (in & 0x10) ? 0x08 : 0x00;
+	        out |= (in & 0x20) ? 0x04 : 0x00;
+	        out |= (in & 0x40) ? 0x02 : 0x00;
+	        out |= (in & 0x80) ? 0x01 : 0x00;
+
+	return out;
+}
+
+void xfer_spi(uint8_t* data, uint32_t len){
+	/* Reverse bit order of all bytes */
+	for(int i = 0; i < len; i++){
+		data[i] = bit_reverse(data[i]);
+	}
+
+	/* Don't switch states if we're already in SHIFT-DR */
+	if(jtag_current_state() != STATE_SHIFT_DR)
+		jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data, data, len * 8, true);
+
+	/* Reverse bit order of all return bytes */
+	for(int i = 0; i < len; i++){
+		data[i] = bit_reverse(data[i]);
+	}
+}
+
+void send_spi(uint8_t* data, uint32_t len){
+	uint8_t unused[len];
+	
+	/* Flip bit order of all bytes */
+	for(int i = 0; i < len; i++){
+		data[i] = bit_reverse(data[i]);
+	}
+
+	jtag_go_to_state(STATE_SHIFT_DR);
+	/* Stay in SHIFT-DR state, this keep CS low */
+	jtag_tap_shift(data, unused, len * 8, false); 
+}
+
 // ---------------------------------------------------------
 // FLASH function implementations
 // ---------------------------------------------------------
@@ -140,18 +192,6 @@ static void flash_reset()
 {
 	uint8_t data[8] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	xfer_spi(data, 8);
-}
-
-static void flash_power_up()
-{
-	uint8_t data_rpd[1] = { FC_RPD };
-	xfer_spi(data_rpd, 1);
-}
-
-static void flash_power_down()
-{
-	uint8_t data[1] = { FC_PD };
-	xfer_spi(data, 1);
 }
 
 static uint8_t flash_read_status()
@@ -351,58 +391,6 @@ static void flash_disable_protection()
 	if (data[1] != 0x00)
 		fprintf(stderr, "failed to disable protection, SR now equal to 0x%02x (expected 0x00)\n", data[1]);
 
-}
-
-// ---------------------------------------------------------
-// JTAG -> SPI functions
-// ---------------------------------------------------------
-
-/* 
- * JTAG performrs all shifts LSB first, our FLSAH is expeting bytes MSB first,
- * There are a few ways to fix this, for now we just bit-reverse all the input data to the JTAG core
- */
-uint8_t bit_reverse(uint8_t in){
-
-	uint8_t out =  (in & 0x01) ? 0x80 : 0x00;
-	        out |= (in & 0x02) ? 0x40 : 0x00;
-	        out |= (in & 0x04) ? 0x20 : 0x00;
-	        out |= (in & 0x08) ? 0x10 : 0x00;
-	        out |= (in & 0x10) ? 0x08 : 0x00;
-	        out |= (in & 0x20) ? 0x04 : 0x00;
-	        out |= (in & 0x40) ? 0x02 : 0x00;
-	        out |= (in & 0x80) ? 0x01 : 0x00;
-
-	return out;
-}
-
-void xfer_spi(uint8_t* data, uint32_t len){
-	/* Reverse bit order of all bytes */
-	for(int i = 0; i < len; i++){
-		data[i] = bit_reverse(data[i]);
-	}
-
-	/* Don't switch states if we're already in SHIFT-DR */
-	if(jtag_current_state() != STATE_SHIFT_DR)
-		jtag_go_to_state(STATE_SHIFT_DR);
-	jtag_tap_shift(data, data, len * 8, true);
-
-	/* Reverse bit order of all return bytes */
-	for(int i = 0; i < len; i++){
-		data[i] = bit_reverse(data[i]);
-	}
-}
-
-void send_spi(uint8_t* data, uint32_t len){
-	uint8_t unused[len];
-	
-	/* Flip bit order of all bytes */
-	for(int i = 0; i < len; i++){
-		data[i] = bit_reverse(data[i]);
-	}
-
-	jtag_go_to_state(STATE_SHIFT_DR);
-	/* Stay in SHIFT-DR state, this keep CS low */
-	jtag_tap_shift(data, unused, len * 8, false); 
 }
 
 // ---------------------------------------------------------
@@ -895,10 +883,7 @@ int main(int argc, char **argv)
 	// ---------------------------------------------------------
 
 	fprintf(stderr, "init..");
-	mpsse_init(ifnum, devstr, slow_clock);
-
-	fprintf(stderr, "jtag..\n");
-	mpsse_jtag_init();
+	jtag_init(ifnum, devstr, slow_clock);
 
 	fprintf(stderr, "idcode..\n");
 	read_idcode();
@@ -973,7 +958,6 @@ int main(int argc, char **argv)
 		
 
 		flash_reset();
-		flash_power_up();
 
 		flash_read_id();
 
@@ -1070,7 +1054,7 @@ int main(int argc, char **argv)
 				flash_read(rw_offset + addr, buffer_flash, rc);
 				if (memcmp(buffer_file, buffer_flash, rc)) {
 					fprintf(stderr, "Found difference between flash and file!\n");
-					mpsse_error(3);
+					jtag_error(3);
 				}
 			}
 
@@ -1086,6 +1070,6 @@ int main(int argc, char **argv)
 	// ---------------------------------------------------------
 
 	fprintf(stderr, "Bye.\n");
-	mpsse_close();
+	jtag_deinit();
 	return 0;
 }

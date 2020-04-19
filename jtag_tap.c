@@ -118,22 +118,21 @@ void jtag_set_current_state(uint8_t state)
 	current_state = state;
 }
 
-
-/**
- * Hook for any per-platform initialization that needs to occur.
- */
-__attribute__((weak)) void jtag_platform_init(void)
-{
-
+void jtag_error(int status){
+	mpsse_error(status);
 }
 
+void jtag_deinit(){
+	mpsse_close();
+}
 
 /**
  * Performs any start-of-day tasks necessary to talk JTAG to our FPGA.
  */
-void jtag_init(void)
+void jtag_init(int ifnum, const char *devstr, bool slow_clock)
 {
-	jtag_platform_init();
+	mpsse_init(ifnum, devstr, slow_clock);
+
 	jtag_set_current_state(STATE_TEST_LOGIC_RESET);
     jtag_go_to_state(STATE_TEST_LOGIC_RESET);
 }
@@ -144,9 +143,8 @@ uint16_t rx_cnt;
 
 extern struct ftdi_context mpsse_ftdic;
 
-static inline uint8_t jtag_pulse_clock_and_read_tdo(bool tms, bool tdi)
+static inline void jtag_pulse_clock_and_read_tdo(bool tms, bool tdi)
 {
-	uint8_t ret;
     *ptr++ = MC_DATA_TMS | MC_DATA_IN | MC_DATA_LSB | MC_DATA_BITS;
 	*ptr++ =  0;        
     *ptr++ = (tdi ? 0x80 : 0) | (tms ? 0x01 : 0);
@@ -168,7 +166,6 @@ static void _jtag_tap_shift(
 
 	for (uint32_t i = 0; i < byte_count; ++i) {
 		uint8_t byte_out = input_data[i];
-		uint8_t tdo_byte = 0;
 		for (int j = 0; j < 8 && bit_count-- > 0; ++j) {
             bool tms = false;
 			if (bit_count == 0 && must_end) {
@@ -237,11 +234,6 @@ void jtag_go_to_state(unsigned state)
 		mpsse_xfer(data, 3, 0);
 		
 	} else {
-		uint8_t d = 0;
-		uint8_t count = 0;
-
-		uint8_t* ptr = data;
-
 		while (jtag_current_state() != state) {
 			uint8_t data[3] = {
 				MC_DATA_TMS | MC_DATA_LSB | MC_DATA_ICN | MC_DATA_BITS,

@@ -77,7 +77,7 @@ void mpsse_check_rx()
 
 void mpsse_error(int status)
 {
-	mpsse_check_rx();
+	//mpsse_check_rx();
 	fprintf(stderr, "ABORT.\n");
 	if (mpsse_ftdic_open) {
 		if (mpsse_ftdic_latency_set)
@@ -145,21 +145,6 @@ void mpsse_xfer(uint8_t* data_buffer, uint16_t send_length, uint16_t receive_len
 			}
 		}
 	}
-}
-
-void mpsse_jtag_init(){
-	mpsse_send_byte(MC_SETB_LOW);
-	mpsse_send_byte(0x08); /* Value */
-	mpsse_send_byte(0x0B); /* Direction */
-
-	/* Reset JTAG State machine */
-	jtag_init();
-}
-
-void mpsse_jtag_tms(uint8_t bits, uint8_t pattern){
-	mpsse_send_byte(MC_DATA_TMS | MC_DATA_LSB | MC_DATA_BITS);
-	mpsse_send_byte(bits-1);
-	mpsse_send_byte(pattern);
 }
 
 void mpsse_init(int ifnum, const char *devstr, bool slow_clock)
@@ -247,6 +232,10 @@ void mpsse_init(int ifnum, const char *devstr, bool slow_clock)
 		mpsse_send_byte(4);
 		mpsse_send_byte(0x00);
 	}
+
+	mpsse_send_byte(MC_SETB_LOW);
+	mpsse_send_byte(0x08); /* Value */
+	mpsse_send_byte(0x0B); /* Direction */
 }
 
 void mpsse_close(void)
