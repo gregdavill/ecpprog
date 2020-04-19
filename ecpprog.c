@@ -115,13 +115,8 @@ static void flash_read_id()
 	if (verbose)
 		fprintf(stderr, "read flash ID..\n");
 
-	//flash_chip_select();
-
 	// Write command and read first 4 bytes
-	////mpsse_xfer_spi(data, len);
 	xfer_spi(data, len);
-	//jtag_go_to_state(STATE_SHIFT_DR);
-	//jtag_tap_shift(data, data, 8*5, false);
 
 	if (data[4] == 0xFF)
 		fprintf(stderr, "Extended Device String Length is 0xFF, "
@@ -139,7 +134,6 @@ static void flash_read_id()
 	for (int i = 1; i < len; i++)
 		fprintf(stderr, " 0x%02X", data[i]);
 	fprintf(stderr, "\n");
-
 }
 
 static void flash_reset()
@@ -157,8 +151,7 @@ static void flash_power_up()
 static void flash_power_down()
 {
 	uint8_t data[1] = { FC_PD };
-	jtag_go_to_state(STATE_SHIFT_DR);
-	jtag_tap_shift(data, data, 8, true);
+	xfer_spi(data, 1);
 }
 
 static uint8_t flash_read_status()
@@ -210,8 +203,6 @@ static uint8_t flash_read_status()
 				"Busy");
 	}
 
-	usleep(1000);
-
 	return data[1];
 }
 
@@ -226,9 +217,7 @@ static void flash_write_enable()
 		fprintf(stderr, "write enable..\n");
 
 	uint8_t data[1] = { FC_WE };
-	//flash_chip_select();
-	//mpsse_xfer_spi(data, 1);
-	//flash_chip_deselect();
+	xfer_spi(data, 1);
 
 	if (verbose) {
 		fprintf(stderr, "status after enable:\n");
@@ -241,9 +230,7 @@ static void flash_bulk_erase()
 	fprintf(stderr, "bulk erase..\n");
 
 	uint8_t data[1] = { FC_CE };
-	//flash_chip_select();
-	//mpsse_xfer_spi(data, 1);
-	//flash_chip_deselect();
+	xfer_spi(data, 1);
 }
 
 static void flash_4kB_sector_erase(int addr)
@@ -252,9 +239,7 @@ static void flash_4kB_sector_erase(int addr)
 
 	uint8_t command[4] = { FC_SE, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
-	//flash_chip_select();
-	//mpsse_send_spi(command, 4);
-	//flash_chip_deselect();
+	xfer_spi(command, 4);
 }
 
 static void flash_32kB_sector_erase(int addr)
@@ -263,9 +248,7 @@ static void flash_32kB_sector_erase(int addr)
 
 	uint8_t command[4] = { FC_BE32, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
-	//flash_chip_select();
-	//mpsse_send_spi(command, 4);
-	//flash_chip_deselect();
+	xfer_spi(command, 4);
 }
 
 static void flash_64kB_sector_erase(int addr)
@@ -274,9 +257,7 @@ static void flash_64kB_sector_erase(int addr)
 
 	uint8_t command[4] = { FC_BE64, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
-	//flash_chip_select();
-	//mpsse_send_spi(command, 4);
-	//flash_chip_deselect();
+	xfer_spi(command, 4);
 }
 
 static void flash_prog(int addr, uint8_t *data, int n)
@@ -286,11 +267,9 @@ static void flash_prog(int addr, uint8_t *data, int n)
 
 	uint8_t command[4] = { FC_PP, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
-	//flash_chip_select();
-	//mpsse_send_spi(command, 4);
-	//mpsse_send_spi(data, n);
-	//flash_chip_deselect();
-
+	send_spi(command, 4);
+	xfer_spi(data, n);
+	
 	if (verbose)
 		for (int i = 0; i < n; i++)
 			fprintf(stderr, "%02x%c", data[i], i == n - 1 || i % 32 == 31 ? '\n' : ' ');
@@ -303,13 +282,10 @@ static void flash_read(int addr, uint8_t *data, int n)
 
 	uint8_t command[4] = { FC_RD, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
-	//flash_chip_select();
-	//mpsse_send_spi(command, 4);
 	send_spi(command, 4);
 	memset(data, 0, n);
 	xfer_spi(data, n);
-	//flash_chip_deselect();
-
+	
 	if (verbose)
 		for (int i = 0; i < n; i++)
 			fprintf(stderr, "%02x%c", data[i], i == n - 1 || i % 32 == 31 ? '\n' : ' ');
@@ -325,9 +301,7 @@ static void flash_wait()
 	{
 		uint8_t data[2] = { FC_RSR1 };
 
-		//flash_chip_select();
-		//mpsse_xfer_spi(data, 2);
-		//flash_chip_deselect();
+		xfer_spi(data, 2);
 
 		if ((data[1] & 0x01) == 0) {
 			if (count < 2) {
@@ -365,18 +339,14 @@ static void flash_disable_protection()
 
 	// Write Status Register 1 <- 0x00
 	uint8_t data[2] = { FC_WSR1, 0x00 };
-	//flash_chip_select();
-	//mpsse_xfer_spi(data, 2);
-	//flash_chip_deselect();
+	xfer_spi(data, 2);
 	
 	flash_wait();
 	
 	// Read Status Register 1
 	data[0] = FC_RSR1;
 
-	//flash_chip_select();
-	//mpsse_xfer_spi(data, 2);
-	//flash_chip_deselect();
+	xfer_spi(data, 2);
 
 	if (data[1] != 0x00)
 		fprintf(stderr, "failed to disable protection, SR now equal to 0x%02x (expected 0x00)\n", data[1]);
@@ -959,6 +929,7 @@ int main(int argc, char **argv)
 		// Reset
 		// ---------------------------------------------------------
 
+		fprintf(stderr, "Not Supported yet\n");
 		fprintf(stderr, "reset..\n");
 
 		//sram_reset();
@@ -1105,17 +1076,6 @@ int main(int argc, char **argv)
 
 			fprintf(stderr, "VERIFY OK\n");
 		}
-
-
-		// ---------------------------------------------------------
-		// Reset
-		// ---------------------------------------------------------
-
-		//flash_power_down();
-
-		usleep(250000);
-
-		
 	}
 
 	if (f != NULL && f != stdin && f != stdout)
