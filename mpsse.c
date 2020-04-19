@@ -61,12 +61,17 @@ unsigned char mpsse_ftdi_latency;
 
 void mpsse_check_rx()
 {
+	uint8_t cnt = 0;
 	while (1) {
 		uint8_t data;
 		int rc = ftdi_read_data(&mpsse_ftdic, &data, 1);
 		if (rc <= 0)
 			break;
 		fprintf(stderr, "unexpected rx byte: %02X\n", data);
+		cnt++;
+
+		if(cnt > 32)
+			break;
 	}
 }
 
@@ -103,7 +108,7 @@ void mpsse_send_byte(uint8_t data)
 {
 	int rc = ftdi_write_data(&mpsse_ftdic, &data, 1);
 	if (rc != 1) {
-		fprintf(stderr, "Write error (single byte, rc=%d, expected %d).\n", rc, 1);
+		fprintf(stderr, "Write error (single byte, rc=%d, expected %d)(%s).\n", rc, 1, ftdi_get_error_string(&mpsse_ftdic));
 		mpsse_error(2);
 	}
 }
@@ -284,12 +289,18 @@ void mpsse_init(int ifnum, const char *devstr, bool slow_clock)
 
 	/* Enter MPSSE (Multi-Protocol Synchronous Serial Engine) mode. Set all pins to output. */
 	if (ftdi_set_bitmode(&mpsse_ftdic, 0xff, BITMODE_MPSSE) < 0) {
-		fprintf(stderr, "Failed to set BITMODE_MPSSE on iCE FTDI USB device.\n");
+		fprintf(stderr, "Failed to set BITMODE_MPSSE on FTDI USB device.\n");
+		mpsse_error(2);
+	}
+
+	int rc = ftdi_usb_purge_buffers(&mpsse_ftdic);
+	if (rc != 0) {
+		fprintf(stderr, "Purge error.\n");
 		mpsse_error(2);
 	}
 
 	// enable clock divide by 5
-	mpsse_send_byte(MC_TCK_D5);
+	//mpsse_send_byte(MC_TCK_D5);
 
 	if (slow_clock) {
 		// set 50 kHz clock
@@ -299,15 +310,10 @@ void mpsse_init(int ifnum, const char *devstr, bool slow_clock)
 	} else {
 		// set 6 MHz clock
 		mpsse_send_byte(MC_SET_CLK_DIV);
-		mpsse_send_byte(0x00);
+		mpsse_send_byte(5);
 		mpsse_send_byte(0x00);
 	}
 
-	int rc = ftdi_usb_purge_buffers(&mpsse_ftdic);
-	if (rc != 0) {
-		fprintf(stderr, "Purge error.\n");
-		mpsse_error(2);
-	}
 }
 
 void mpsse_close(void)

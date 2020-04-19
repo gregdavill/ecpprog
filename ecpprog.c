@@ -134,14 +134,12 @@ static void flash_read_id()
 			xfer_spi(data, len);
 		}
 	}
-
-	////flash_chip_deselect();
-
-	// TODO: Add full decode of the JEDEC ID.
+	
 	fprintf(stderr, "flash ID:");
 	for (int i = 1; i < len; i++)
 		fprintf(stderr, " 0x%02X", data[i]);
 	fprintf(stderr, "\n");
+
 }
 
 static void flash_reset()
@@ -497,7 +495,7 @@ static void print_status_register(uint32_t status){
 		printf("  Invalid Command:    %s\n",  status & (1 << 28) ? "Yes" : "No" );
 		printf("  SED Error:          %s\n",  status & (1 << 29) ? "Yes" : "No" );
 		printf("  Bypass Mode:        %s\n",  status & (1 << 30) ? "Yes" : "No" );
-		printf("  Flow Througuh Mode: %s\n",  status & (1 << 31) ? "Yes" : "No" );
+		printf("  Flow Through Mode:  %s\n",  status & (1 << 31) ? "Yes" : "No" );
 	}
 }
 
@@ -545,15 +543,13 @@ static void enter_spi_background_mode(){
 
 
 void ecp_jtag_cmd(uint8_t cmd){
-	uint8_t data_in[1] = {0};
-	uint8_t data_out[1] = {0};
+	uint8_t data[1] = {cmd};
 
-	data_in[0] = cmd;
 	jtag_go_to_state(STATE_SHIFT_IR);
-	jtag_tap_shift(data_in, data_out, 8, true);
+	jtag_tap_shift(data, data, 8, true);
 
 	jtag_go_to_state(STATE_RUN_TEST_IDLE);
-	jtag_wait_time(10);
+	jtag_wait_time(10);	
 }
 
 // ---------------------------------------------------------
@@ -912,15 +908,19 @@ int main(int argc, char **argv)
 	// Initialize USB connection to FT2232H
 	// ---------------------------------------------------------
 
-	fprintf(stderr, "init..\n");
-
+	fprintf(stderr, "init..");
 	mpsse_init(ifnum, devstr, slow_clock);
+
+	fprintf(stderr, "jtag..\n");
 	mpsse_jtag_init();
 
+	fprintf(stderr, "idcode..\n");
 	read_idcode();
+
+	fprintf(stderr, "status..\n");
 	read_status_register();
 
-	usleep(20000);
+	//usleep(20000);
 
 	if (test_mode)
 	{
@@ -934,10 +934,10 @@ int main(int argc, char **argv)
 		/* Put device into SPI bypass mode */
 		enter_spi_background_mode();
 
-		usleep(20000);
+		//usleep(20000);
 		flash_reset();
 
-		usleep(20000);
+		//usleep(20000);
 
 		flash_read_id();
 	}

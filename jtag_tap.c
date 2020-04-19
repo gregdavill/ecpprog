@@ -157,7 +157,7 @@ extern struct ftdi_context mpsse_ftdic;
 static inline uint8_t jtag_pulse_clock_and_read_tdo(bool tms, bool tdi)
 {
 	uint8_t ret;
-    *ptr++ = MC_DATA_TMS | MC_DATA_IN  | MC_DATA_LSB |  MC_DATA_BITS;
+    *ptr++ = MC_DATA_TMS | MC_DATA_IN | MC_DATA_LSB | MC_DATA_BITS;
 	*ptr++ =  0;
 
     uint8_t data0 = 0;
@@ -192,9 +192,6 @@ void jtag_tap_shift(
 	for (uint32_t i = 0; i < byte_count; ++i) {
 		uint8_t byte_out = input_data[i];
 		uint8_t tdo_byte = 0;
-
-		
-
 		for (int j = 0; j < 8 && bit_count-- > 0; ++j) {
             bool tms = false;
             bool tdi = false;
@@ -211,8 +208,6 @@ void jtag_tap_shift(
 			bool tdo = jtag_pulse_clock_and_read_tdo(tms, tdi);
 			tdo_byte |= tdo << j;
 		}
-
-
 	}
 	printf(" Tx: %u, Rx: %u\n", ptr-data, rx_cnt);
 	int rc = ftdi_write_data(&mpsse_ftdic, &data, ptr-data);
@@ -220,6 +215,8 @@ void jtag_tap_shift(
 		fprintf(stderr, "Write error (single byte, rc=%d, expected %d).\n", rc, 1);
 		mpsse_error(2);
 	}
+
+
 	rc = ftdi_read_data(&mpsse_ftdic, &data, rx_cnt);
 	if (rc < 0) {
 		fprintf(stderr, "Read error.\n");
@@ -240,24 +237,12 @@ void jtag_state_ack(bool tms)
 
 void jtag_state_step(bool tms)
 {
-    
-    //mpsse_send_byte(MC_DATA_TMS | MC_DATA_LSB | MC_DATA_BITS);
-	//mpsse_send_byte(0);
-	if (tms) {
-    //	mpsse_send_byte(1);
-	} else {
-    //    mpsse_send_byte(0);
-	}
-    
 	jtag_state_ack(tms);
 }
 
 
-uint8_t bit_reverse(uint8_t);
-
 void jtag_go_to_state(unsigned state)
 {
-	mpsse_purge();
 
 	if (state == STATE_TEST_LOGIC_RESET) {
 		for (int i = 0; i < 5; ++i) {
@@ -288,8 +273,15 @@ void jtag_go_to_state(unsigned state)
 
 void jtag_wait_time(uint32_t microseconds)
 {
-	while (microseconds--) {
-		jtag_pulse_clock();
+	uint16_t bytes = microseconds / 8;
+	uint8_t remain = microseconds % 8;
+	mpsse_send_byte( MC_CLK_N8 );
+	mpsse_send_byte(bytes & 0xFF);
+	mpsse_send_byte((bytes >> 8) & 0xFF);
+
+	if(remain){
+		mpsse_send_byte( MC_CLK_N );
+		mpsse_send_byte( remain );
 	}
 }
 
