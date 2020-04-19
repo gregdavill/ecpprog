@@ -138,9 +138,9 @@ void jtag_init(void)
     jtag_go_to_state(STATE_TEST_LOGIC_RESET);
 }
 
-uint8_t data[1024];
+uint8_t data[32*1024];
 uint8_t* ptr;
-uint8_t rx_cnt;
+uint16_t rx_cnt;
 
 extern struct ftdi_context mpsse_ftdic;
 
@@ -153,14 +153,14 @@ static inline uint8_t jtag_pulse_clock_and_read_tdo(bool tms, bool tdi)
 	rx_cnt++;
 }
 
-
-void jtag_tap_shift(
+static void _jtag_tap_shift(
 	uint8_t *input_data,
 	uint8_t *output_data,
 	uint32_t data_bits,
 	bool must_end)
 {
 
+	//printf("_jtag_tap_shift(0x%08x,0x%08x,%u,%s);\n",input_data, output_data, data_bits, must_end ? "true" : "false");
 	uint32_t bit_count = data_bits;
 	uint32_t byte_count = (data_bits + 7) / 8;
 	rx_cnt = 0;
@@ -186,6 +186,30 @@ void jtag_tap_shift(
 	 * Instead of reconstructing the bitpattern, we can just take every 8th byte.*/
 	for(int i = 0; i < rx_cnt/8; i++)
 		output_data[i] = data[7+i*8];
+}
+
+#define MIN(a,b) (a < b) ? a : b
+
+void jtag_tap_shift(
+	uint8_t *input_data,
+	uint8_t *output_data,
+	uint32_t data_bits,
+	bool must_end)
+{
+	uint32_t data_bits_sent = 0;
+	while(data_bits_sent != data_bits){
+
+		uint32_t _data_bits = MIN(256, data_bits);
+		bool last = (data_bits_sent + _data_bits) == data_bits;
+
+		_jtag_tap_shift(
+			input_data + data_bits_sent/8,
+			output_data + data_bits_sent/8,
+			_data_bits,
+			last & must_end
+		);
+		data_bits_sent += _data_bits;
+	}
 }
 
 void jtag_state_ack(bool tms)

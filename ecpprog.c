@@ -305,8 +305,9 @@ static void flash_read(int addr, uint8_t *data, int n)
 
 	//flash_chip_select();
 	//mpsse_send_spi(command, 4);
+	send_spi(command, 4);
 	memset(data, 0, n);
-	//mpsse_xfer_spi(data, n);
+	xfer_spi(data, n);
 	//flash_chip_deselect();
 
 	if (verbose)
@@ -405,18 +406,33 @@ uint8_t bit_reverse(uint8_t in){
 }
 
 void xfer_spi(uint8_t* data, uint32_t len){
+	/* Reverse bit order of all bytes */
+	for(int i = 0; i < len; i++){
+		data[i] = bit_reverse(data[i]);
+	}
+
+	/* Don't switch states if we're already in SHIFT-DR */
+	if(jtag_current_state() != STATE_SHIFT_DR)
+		jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data, data, len * 8, true);
+
+	/* Reverse bit order of all return bytes */
+	for(int i = 0; i < len; i++){
+		data[i] = bit_reverse(data[i]);
+	}
+}
+
+void send_spi(uint8_t* data, uint32_t len){
+	uint8_t unused[len];
+	
 	/* Flip bit order of all bytes */
 	for(int i = 0; i < len; i++){
 		data[i] = bit_reverse(data[i]);
 	}
 
 	jtag_go_to_state(STATE_SHIFT_DR);
-	jtag_tap_shift(data, data, len * 8, true);
-
-	/* Flip bit order of all bytes */
-	for(int i = 0; i < len; i++){
-		data[i] = bit_reverse(data[i]);
-	}
+	/* Stay in SHIFT-DR state, this keep CS low */
+	jtag_tap_shift(data, unused, len * 8, false); 
 }
 
 // ---------------------------------------------------------
@@ -920,19 +936,19 @@ int main(int argc, char **argv)
 	fprintf(stderr, "status..\n");
 	read_status_register();
 
+
+	/* Reset ECP5 to release SPI interface */
+	ecp_jtag_cmd(ISC_ENABLE);
+	ecp_jtag_cmd(ISC_ERASE);
+	ecp_jtag_cmd(ISC_DISABLE);
+
+	/* Put device into SPI bypass mode */
+	enter_spi_background_mode();
 	//usleep(20000);
 
 	if (test_mode)
 	{
 
-
-		/* Reset ECP5 to release SPI interface */
-		ecp_jtag_cmd(ISC_ENABLE);
-		ecp_jtag_cmd(ISC_ERASE);
-		ecp_jtag_cmd(ISC_DISABLE);
-
-		/* Put device into SPI bypass mode */
-		enter_spi_background_mode();
 
 		flash_reset();
 		flash_read_id();
