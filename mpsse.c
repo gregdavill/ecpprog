@@ -121,6 +121,32 @@ void mpsse_purge(void){
 	}
 }
 
+void mpsse_xfer(uint8_t* data_buffer, uint16_t send_length, uint16_t receive_length)
+{
+	if(send_length){
+		int rc = ftdi_write_data(&mpsse_ftdic, data_buffer, send_length);
+		if (rc != send_length) {
+			fprintf(stderr, "Write error (rc=%d, expected %d)[%s]\n", rc, 1, ftdi_get_error_string(&mpsse_ftdic));
+			mpsse_error(2);
+		}
+	}
+
+	if(receive_length){
+		/* Calls to ftdi_read_data may return with less data than requested if it wasn't ready. 
+		 * We stay in this while loop to collect all the data that we expect. */
+		uint16_t rx_len = 0;
+		while(rx_len != receive_length){
+			int rc = ftdi_read_data(&mpsse_ftdic, data_buffer + rx_len, receive_length - rx_len);
+			if (rc < 0) {
+				fprintf(stderr, "Read error (rc=%d)[%s]\n", rc, ftdi_get_error_string(&mpsse_ftdic));
+				mpsse_error(2);
+			}else{
+				rx_len += rc;
+			}
+		}
+	}
+}
+
 void mpsse_send_spi(uint8_t *data, int n)
 {
 	if (n < 1)
@@ -299,9 +325,6 @@ void mpsse_init(int ifnum, const char *devstr, bool slow_clock)
 		mpsse_error(2);
 	}
 
-	// enable clock divide by 5
-	//mpsse_send_byte(MC_TCK_D5);
-
 	if (slow_clock) {
 		// set 50 kHz clock
 		mpsse_send_byte(MC_SET_CLK_DIV);
@@ -313,7 +336,6 @@ void mpsse_init(int ifnum, const char *devstr, bool slow_clock)
 		mpsse_send_byte(5);
 		mpsse_send_byte(0x00);
 	}
-
 }
 
 void mpsse_close(void)

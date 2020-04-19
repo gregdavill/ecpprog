@@ -934,11 +934,7 @@ int main(int argc, char **argv)
 		/* Put device into SPI bypass mode */
 		enter_spi_background_mode();
 
-		//usleep(20000);
 		flash_reset();
-
-		//usleep(20000);
-
 		flash_read_id();
 	}
 	else if (prog_sram)

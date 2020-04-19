@@ -138,16 +138,6 @@ void jtag_init(void)
     jtag_go_to_state(STATE_TEST_LOGIC_RESET);
 }
 
-
-static inline void jtag_pulse_clock(void)
-{
-	//mpsse_send_byte(MC_CLK_N);
-	//mpsse_send_byte(0x00);
-    mpsse_send_byte(MC_DATA_TMS | MC_DATA_IN | MC_DATA_LSB | MC_DATA_BITS);
-	mpsse_send_byte(0);
-    mpsse_send_byte(0);
-}
-
 uint8_t data[512];
 uint8_t* ptr;
 uint8_t rx_cnt;
@@ -168,9 +158,6 @@ static inline uint8_t jtag_pulse_clock_and_read_tdo(bool tms, bool tdi)
         
     *ptr++ = data0;
 	rx_cnt++;
-	//ret = mpsse_recv_byte();
-    
-	//return (ret >> 7) & 1;
 }
 
 
@@ -181,8 +168,7 @@ void jtag_tap_shift(
 	bool must_end)
 {
 
-
-	mpsse_purge();
+	printf("Remain: %u \n", mpsse_ftdic.readbuffer_remaining);
 
 	uint32_t bit_count = data_bits;
 	uint32_t byte_count = (data_bits + 7) / 8;
@@ -194,36 +180,23 @@ void jtag_tap_shift(
 		uint8_t tdo_byte = 0;
 		for (int j = 0; j < 8 && bit_count-- > 0; ++j) {
             bool tms = false;
-            bool tdi = false;
 			if (bit_count == 0 && must_end) {
                 tms = true;
 				jtag_state_ack(1);
 			}
-			if (byte_out & 1) {
-				tdi = true;
-			} else {
-				tdi = false;
-			}
+			jtag_pulse_clock_and_read_tdo(tms, byte_out & 1);
 			byte_out >>= 1;
-			bool tdo = jtag_pulse_clock_and_read_tdo(tms, tdi);
-			tdo_byte |= tdo << j;
 		}
 	}
-	printf(" Tx: %u, Rx: %u\n", ptr-data, rx_cnt);
-	int rc = ftdi_write_data(&mpsse_ftdic, &data, ptr-data);
-	if (rc != (ptr-data)) {
-		fprintf(stderr, "Write error (single byte, rc=%d, expected %d).\n", rc, 1);
-		mpsse_error(2);
-	}
 
-
-	rc = ftdi_read_data(&mpsse_ftdic, &data, rx_cnt);
-	if (rc < 0) {
-		fprintf(stderr, "Read error.\n");
-		mpsse_error(2);
-	}
+	mpsse_xfer(data, ptr-data, rx_cnt);
+	
 	for(int i = 0; i < rx_cnt/8; i++)
 		output_data[i] = data[7+i*8];
+
+
+	printf("finish: %u - %u \n", rx_cnt, mpsse_ftdic.readbuffer_remaining);
+
 }
 
 void jtag_state_ack(bool tms)
@@ -235,53 +208,61 @@ void jtag_state_ack(bool tms)
 	}
 }
 
-void jtag_state_step(bool tms)
-{
-	jtag_state_ack(tms);
-}
-
-
 void jtag_go_to_state(unsigned state)
 {
 
 	if (state == STATE_TEST_LOGIC_RESET) {
 		for (int i = 0; i < 5; ++i) {
-			jtag_state_step(true);
+			jtag_state_ack(true);
 		}
-		mpsse_send_byte(MC_DATA_TMS | MC_DATA_LSB | MC_DATA_BITS);
-		mpsse_send_byte(5 - 1);
-		mpsse_send_byte(0b11111);
+
+		uint8_t data[3] = { 
+			MC_DATA_TMS | MC_DATA_LSB | MC_DATA_BITS,
+			5 - 1,
+			0b11111
+		};
+		mpsse_xfer(data, 3, 0);
 		
 	} else {
 		uint8_t d = 0;
 		uint8_t count = 0;
-		while (jtag_current_state() != state) {
-			d = (d >> 1) & ~0x80;
-			if((tms_map[jtag_current_state()] >> state) & 1){
-				d |= 0x80;
-			}
-			count++;
 
-			jtag_state_step((tms_map[jtag_current_state()] >> state) & 1);
+		uint8_t* ptr = data;
+
+		while (jtag_current_state() != state) {
+			uint8_t data[3] = {
+				MC_DATA_TMS | MC_DATA_LSB | MC_DATA_ICN | MC_DATA_BITS,
+				0,
+				(tms_map[jtag_current_state()] >> state) & 1
+			};
+
+			jtag_state_ack((tms_map[jtag_current_state()] >> state) & 1);
+			mpsse_xfer(data, 3, 0);
 		}
-		mpsse_send_byte(MC_DATA_TMS | MC_DATA_LSB | MC_DATA_BITS);
-		mpsse_send_byte(count - 1);
-		mpsse_send_byte(d >> (8-count));
-		
 	}
+
+	printf(" - Remain: %u \n", mpsse_ftdic.readbuffer_remaining);
 }
 
 void jtag_wait_time(uint32_t microseconds)
 {
 	uint16_t bytes = microseconds / 8;
 	uint8_t remain = microseconds % 8;
-	mpsse_send_byte( MC_CLK_N8 );
-	mpsse_send_byte(bytes & 0xFF);
-	mpsse_send_byte((bytes >> 8) & 0xFF);
+
+	uint8_t data[3] = {
+		MC_CLK_N8,
+		bytes & 0xFF,
+		(bytes >> 8) & 0xFF
+	};
+	mpsse_xfer(data, 3, 0);
 
 	if(remain){
-		mpsse_send_byte( MC_CLK_N );
-		mpsse_send_byte( remain );
+		data[0] = MC_CLK_N;
+		data[1] = remain;
+		mpsse_xfer(data, 2, 0);
 	}
+
+
+	printf(" -- Remain: %u \n", mpsse_ftdic.readbuffer_remaining);
 }
 
