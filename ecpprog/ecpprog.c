@@ -199,8 +199,7 @@ static void flash_reset()
 	xfer_spi(data, 8);
 }
 
-static uint8_t flash_read_status()
-{
+static uint8_t read_status_1(){
 	uint8_t data[2] = { FC_RSR1 };
 
 	xfer_spi(data, 2);
@@ -250,6 +249,32 @@ static uint8_t flash_read_status()
 
 	return data[1];
 }
+
+static uint8_t read_status_2(){
+	uint8_t data[2] = { FC_RSR2 };
+
+	xfer_spi(data, 2);
+
+	if (verbose) {
+		fprintf(stderr, "SR2: 0x%02X\n", data[1]);
+		fprintf(stderr, " - QE: %s\n",
+			((data[1] & (1 << 2)) == 0) ? 
+				"enabled" : 
+				"disabled");
+
+	}
+
+	return data[1];
+}
+
+static uint8_t flash_read_status()
+{
+	uint8_t ret = read_status_1();
+	read_status_2();
+
+	return ret;
+}
+
 
 static void flash_write_enable()
 {
@@ -338,22 +363,6 @@ static void flash_continue_read(uint8_t *data, int n)
 
 	memset(data, 0, n);
 	send_spi(data, n);
-	
-	if (verbose)
-		for (int i = 0; i < n; i++)
-			fprintf(stderr, "%02x%c", data[i], i == n - 1 || i % 32 == 31 ? '\n' : ' ');
-}
-
-static void flash_read(int addr, uint8_t *data, int n)
-{
-	if (verbose)
-		fprintf(stderr, "read 0x%06X +0x%03X..\n", addr, n);
-
-	uint8_t command[4] = { FC_RD, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
-
-	send_spi(command, 4);
-	memset(data, 0, n);
-	xfer_spi(data, n);
 	
 	if (verbose)
 		for (int i = 0; i < n; i++)
@@ -942,6 +951,8 @@ int main(int argc, char **argv)
 
 		flash_reset();
 		flash_read_id();
+
+		flash_read_status();
 	}
 	else if (prog_sram)
 	{
@@ -1055,10 +1066,12 @@ int main(int argc, char **argv)
 
 			if (!erase_mode)
 			{
-				fprintf(stderr, "programming..\n");
-
 				for (int rc, addr = 0; true; addr += rc) {
 					uint8_t buffer[256];
+
+					/* Show progress */
+					fprintf(stderr, "\r\033[0Kprogramming..  %04u/%04lu", addr, file_size);
+
 					int page_size = 256 - (rw_offset + addr) % 256;
 					rc = fread(buffer, 1, page_size, f);
 					if (rc <= 0)
@@ -1066,8 +1079,10 @@ int main(int argc, char **argv)
 					flash_write_enable();
 					flash_prog(rw_offset + addr, buffer, rc);
 					flash_wait();
+
 				}
 
+				fprintf(stderr, "\n");
 				/* seek to the beginning for second pass */
 				fseek(f, 0, SEEK_SET);
 			}
@@ -1078,29 +1093,39 @@ int main(int argc, char **argv)
 		// ---------------------------------------------------------
 
 		if (read_mode) {
-			fprintf(stderr, "reading..\n");
 
 			flash_start_read(rw_offset);
 			for (int addr = 0; addr < read_size; addr += 4096) {
 				uint8_t buffer[4096];
+
+				/* Show progress */
+				fprintf(stderr, "\r\033[0Kreading..    %04u/%04lu", addr, file_size);
+
 				flash_continue_read(buffer, 4096);
 				fwrite(buffer, read_size - addr > 4096 ? 4096 : read_size - addr, 1, f);
 			}
+			fprintf(stderr, "\n");
 		} else if (!erase_mode && !disable_verify) {
-			fprintf(stderr, "reading..\n");
-			for (int addr = 0; true; addr += 256) {
-				uint8_t buffer_flash[256], buffer_file[256];
-				int rc = fread(buffer_file, 1, 256, f);
+			
+			flash_start_read(rw_offset);
+			for (int addr = 0; addr < read_size; addr += 4096) {
+				uint8_t buffer_flash[4096], buffer_file[4096];
+
+				int rc = fread(buffer_file, 1, 4096, f);
 				if (rc <= 0)
 					break;
-				flash_read(rw_offset + addr, buffer_flash, rc);
+				
+				flash_continue_read(buffer_flash, rc);
+				
+				/* Show progress */
+				fprintf(stderr, "\r\033[0Kverify..       %04u/%04lu", addr + rc, file_size);
 				if (memcmp(buffer_file, buffer_flash, rc)) {
 					fprintf(stderr, "Found difference between flash and file!\n");
 					jtag_error(3);
 				}
-			}
 
-			fprintf(stderr, "VERIFY OK\n");
+			}
+			fprintf(stderr, "  VERIFY OK\n");
 		}
 	}
 
