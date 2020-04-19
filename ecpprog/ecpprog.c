@@ -528,18 +528,16 @@ static void read_status_register(){
 
 static void enter_spi_background_mode(){
 
-	uint8_t data_in[4] = {0,0,0,0};
-	uint8_t data_out[4] = {0,0,0,0};
+	uint8_t data[4] = {0x3A};
 
-	data_in[0] = 0x3A;
 	jtag_go_to_state(STATE_SHIFT_IR);
-	jtag_tap_shift(data_in, data_out, 8, true);
+	jtag_tap_shift(data, data, 8, true);
 
 	/* These bytes seem to be required to un-lock the SPI interface */
-	data_in[0] = 0xFE;
-	data_in[1] = 0x68;
+	data[0] = 0xFE;
+	data[1] = 0x68;
 	jtag_go_to_state(STATE_SHIFT_DR);
-	jtag_tap_shift(data_in, data_out, 16, true);
+	jtag_tap_shift(data, data, 16, true);
 
 	/* Entering IDLE is essential */
 	jtag_go_to_state(STATE_RUN_TEST_IDLE);
@@ -561,12 +559,10 @@ void ecp_jtag_cmd8(uint8_t cmd, uint8_t param){
 
 	jtag_go_to_state(STATE_SHIFT_IR);
 	jtag_tap_shift(data, data, 8, true);
-	jtag_go_to_state(STATE_PAUSE_IR);
 
 	data[0] = param;
 	jtag_go_to_state(STATE_SHIFT_DR);
 	jtag_tap_shift(data, data, 8, true);
-	jtag_go_to_state(STATE_PAUSE_DR);
 
 	jtag_go_to_state(STATE_RUN_TEST_IDLE);
 	jtag_wait_time(32);	
@@ -928,18 +924,11 @@ int main(int argc, char **argv)
 	// Initialize USB connection to FT2232H
 	// ---------------------------------------------------------
 
-	fprintf(stderr, "init..");
+	fprintf(stderr, "init..\n");
 	jtag_init(ifnum, devstr, slow_clock);
 
-	fprintf(stderr, "idcode..\n");
 	read_idcode();
-
-	fprintf(stderr, "status..\n");
 	read_status_register();
-
-
-	
-	//usleep(20000);
 
 	if (test_mode)
 	{
@@ -959,87 +948,39 @@ int main(int argc, char **argv)
 		// ---------------------------------------------------------
 		// Reset
 		// ---------------------------------------------------------
-
-		fprintf(stderr, "Not Supported yet\n");
 		fprintf(stderr, "reset..\n");
 
-
-
-		uint8_t data[1] = {LSC_BITSTREAM_BURST};
-
-
-		fprintf(stderr, "status..\n");
-		read_status_register();
-
 		ecp_jtag_cmd8(ISC_ENABLE, 0);
-
-
 		ecp_jtag_cmd8(ISC_ERASE, 0);
+		ecp_jtag_cmd8(LSC_RESET_CRC, 0);
+
+		read_status_register();
 
 		// ---------------------------------------------------------
 		// Program
 		// ---------------------------------------------------------
 
 		fprintf(stderr, "programming..\n");
-
-
-	//	ecp_jtag_cmd(LSC_BITSTREAM_BURST);
-
-data[0] = LSC_BITSTREAM_BURST;
-	jtag_go_to_state(STATE_SHIFT_IR);
-	jtag_tap_shift(data, data, 8, true);
-
-	jtag_go_to_state(STATE_PAUSE_IR);
+		ecp_jtag_cmd(LSC_BITSTREAM_BURST);
 		while (1) {
-			const uint32_t len = 1024*1024;
-			static unsigned char buffer[1024*1024];
+			const uint32_t len = 16*1024;
+			static unsigned char buffer[16*1024];
 			int rc = fread(buffer, 1, len, f);
 			if (rc <= 0)
 				break;
-			//if (verbose)
-				//fprintf(stderr, "sending %d bytes.\n", rc);
-			
+			if (verbose)
+				fprintf(stderr, "sending %d bytes.\n", rc);
 
-				for(int i = 0; i < len; i++){
-					buffer[i] = bit_reverse(buffer[i]);
-				}
+			for(int i = 0; i < len; i++){
+				buffer[i] = bit_reverse(buffer[i]);
+			}
 
-				jtag_go_to_state(STATE_CAPTURE_DR);
-				jtag_tap_shift(buffer, buffer, len*8, true);
-				jtag_go_to_state(STATE_PAUSE_DR);
-
-		
-
-				/* Entering IDLE is essential */
-				//jtag_go_to_state(STATE_RUN_TEST_IDLE);
-
-
-				//read_status_register();
-
-				
+			jtag_go_to_state(STATE_CAPTURE_DR);
+			jtag_tap_shift(buffer, buffer, len*8, false);
 		}
-
+	
 		ecp_jtag_cmd(ISC_DISABLE);
-		jtag_go_to_state(STATE_RUN_TEST_IDLE);
-		jtag_tap_shift(data, data, 8, true);
-
-		//jtag_wait_time(1000);
-
-
-		fprintf(stderr, "status..\n");
-		verbose = true;
-		read_status_register();
-
-
-
-//		jtag_wait_time(1000);
-
-
-
-		//mpsse_send_dummy_bytes(6);
-		//mpsse_send_dummy_bit();
-
-		
+		read_status_register();	
 	}
 	else /* program flash */
 	{
@@ -1049,16 +990,12 @@ data[0] = LSC_BITSTREAM_BURST;
 
 		fprintf(stderr, "reset..\n");
 		/* Reset ECP5 to release SPI interface */
-		ecp_jtag_cmd(ISC_ENABLE);
-		ecp_jtag_cmd(ISC_ERASE);
-		ecp_jtag_cmd(ISC_DISABLE);
+		ecp_jtag_cmd8(ISC_ENABLE, 0);
+		ecp_jtag_cmd8(ISC_ERASE, 0);
+		ecp_jtag_cmd8(ISC_DISABLE, 0);
 
 		/* Put device into SPI bypass mode */
 		enter_spi_background_mode();
-		
-		usleep(25000);
-
-		
 
 		flash_reset();
 

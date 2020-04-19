@@ -113,13 +113,6 @@ void mpsse_send_byte(uint8_t data)
 	}
 }
 
-void mpsse_purge(void){
-	int rc = ftdi_usb_purge_buffers(&mpsse_ftdic);
-	if (rc != 0) {
-		fprintf(stderr, "Purge error.\n");
-		mpsse_error(2);
-	}
-}
 
 void mpsse_xfer(uint8_t* data_buffer, uint16_t send_length, uint16_t receive_length)
 {
