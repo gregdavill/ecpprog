@@ -118,7 +118,7 @@ static void flash_read_id()
 	//flash_chip_select();
 
 	// Write command and read first 4 bytes
-	//mpsse_xfer_spi(data, len);
+	////mpsse_xfer_spi(data, len);
 	xfer_spi(data, len);
 	//jtag_go_to_state(STATE_SHIFT_DR);
 	//jtag_tap_shift(data, data, 8*5, false);
@@ -227,7 +227,7 @@ static void flash_write_enable()
 
 	uint8_t data[1] = { FC_WE };
 	//flash_chip_select();
-	mpsse_xfer_spi(data, 1);
+	//mpsse_xfer_spi(data, 1);
 	//flash_chip_deselect();
 
 	if (verbose) {
@@ -242,7 +242,7 @@ static void flash_bulk_erase()
 
 	uint8_t data[1] = { FC_CE };
 	//flash_chip_select();
-	mpsse_xfer_spi(data, 1);
+	//mpsse_xfer_spi(data, 1);
 	//flash_chip_deselect();
 }
 
@@ -253,7 +253,7 @@ static void flash_4kB_sector_erase(int addr)
 	uint8_t command[4] = { FC_SE, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
 	//flash_chip_select();
-	mpsse_send_spi(command, 4);
+	//mpsse_send_spi(command, 4);
 	//flash_chip_deselect();
 }
 
@@ -264,7 +264,7 @@ static void flash_32kB_sector_erase(int addr)
 	uint8_t command[4] = { FC_BE32, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
 	//flash_chip_select();
-	mpsse_send_spi(command, 4);
+	//mpsse_send_spi(command, 4);
 	//flash_chip_deselect();
 }
 
@@ -275,7 +275,7 @@ static void flash_64kB_sector_erase(int addr)
 	uint8_t command[4] = { FC_BE64, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
 	//flash_chip_select();
-	mpsse_send_spi(command, 4);
+	//mpsse_send_spi(command, 4);
 	//flash_chip_deselect();
 }
 
@@ -287,8 +287,8 @@ static void flash_prog(int addr, uint8_t *data, int n)
 	uint8_t command[4] = { FC_PP, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
 	//flash_chip_select();
-	mpsse_send_spi(command, 4);
-	mpsse_send_spi(data, n);
+	//mpsse_send_spi(command, 4);
+	//mpsse_send_spi(data, n);
 	//flash_chip_deselect();
 
 	if (verbose)
@@ -304,9 +304,9 @@ static void flash_read(int addr, uint8_t *data, int n)
 	uint8_t command[4] = { FC_RD, (uint8_t)(addr >> 16), (uint8_t)(addr >> 8), (uint8_t)addr };
 
 	//flash_chip_select();
-	mpsse_send_spi(command, 4);
+	//mpsse_send_spi(command, 4);
 	memset(data, 0, n);
-	mpsse_xfer_spi(data, n);
+	//mpsse_xfer_spi(data, n);
 	//flash_chip_deselect();
 
 	if (verbose)
@@ -325,7 +325,7 @@ static void flash_wait()
 		uint8_t data[2] = { FC_RSR1 };
 
 		//flash_chip_select();
-		mpsse_xfer_spi(data, 2);
+		//mpsse_xfer_spi(data, 2);
 		//flash_chip_deselect();
 
 		if ((data[1] & 0x01) == 0) {
@@ -365,7 +365,7 @@ static void flash_disable_protection()
 	// Write Status Register 1 <- 0x00
 	uint8_t data[2] = { FC_WSR1, 0x00 };
 	//flash_chip_select();
-	mpsse_xfer_spi(data, 2);
+	//mpsse_xfer_spi(data, 2);
 	//flash_chip_deselect();
 	
 	flash_wait();
@@ -374,7 +374,7 @@ static void flash_disable_protection()
 	data[0] = FC_RSR1;
 
 	//flash_chip_select();
-	mpsse_xfer_spi(data, 2);
+	//mpsse_xfer_spi(data, 2);
 	//flash_chip_deselect();
 
 	if (data[1] != 0x00)
@@ -964,11 +964,11 @@ int main(int argc, char **argv)
 				break;
 			if (verbose)
 				fprintf(stderr, "sending %d bytes.\n", rc);
-			mpsse_send_spi(buffer, rc);
+			//mpsse_send_spi(buffer, rc);
 		}
 
-		mpsse_send_dummy_bytes(6);
-		mpsse_send_dummy_bit();
+		//mpsse_send_dummy_bytes(6);
+		//mpsse_send_dummy_bit();
 
 		
 	}

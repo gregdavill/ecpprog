@@ -138,7 +138,7 @@ void jtag_init(void)
     jtag_go_to_state(STATE_TEST_LOGIC_RESET);
 }
 
-uint8_t data[512];
+uint8_t data[1024];
 uint8_t* ptr;
 uint8_t rx_cnt;
 
@@ -148,15 +148,8 @@ static inline uint8_t jtag_pulse_clock_and_read_tdo(bool tms, bool tdi)
 {
 	uint8_t ret;
     *ptr++ = MC_DATA_TMS | MC_DATA_IN | MC_DATA_LSB | MC_DATA_BITS;
-	*ptr++ =  0;
-
-    uint8_t data0 = 0;
-    if(tdi)
-        data0 |= 0x80;
-    if(tms)
-        data0 |= 0x01;
-        
-    *ptr++ = data0;
+	*ptr++ =  0;        
+    *ptr++ = (tdi ? 0x80 : 0) | (tms ? 0x01 : 0);
 	rx_cnt++;
 }
 
@@ -167,8 +160,6 @@ void jtag_tap_shift(
 	uint32_t data_bits,
 	bool must_end)
 {
-
-	printf("Remain: %u \n", mpsse_ftdic.readbuffer_remaining);
 
 	uint32_t bit_count = data_bits;
 	uint32_t byte_count = (data_bits + 7) / 8;
@@ -191,12 +182,10 @@ void jtag_tap_shift(
 
 	mpsse_xfer(data, ptr-data, rx_cnt);
 	
+	/* Data out from the FTDI is actually from an internal shift register
+	 * Instead of reconstructing the bitpattern, we can just take every 8th byte.*/
 	for(int i = 0; i < rx_cnt/8; i++)
 		output_data[i] = data[7+i*8];
-
-
-	printf("finish: %u - %u \n", rx_cnt, mpsse_ftdic.readbuffer_remaining);
-
 }
 
 void jtag_state_ack(bool tms)
@@ -240,8 +229,6 @@ void jtag_go_to_state(unsigned state)
 			mpsse_xfer(data, 3, 0);
 		}
 	}
-
-	printf(" - Remain: %u \n", mpsse_ftdic.readbuffer_remaining);
 }
 
 void jtag_wait_time(uint32_t microseconds)
@@ -261,8 +248,5 @@ void jtag_wait_time(uint32_t microseconds)
 		data[1] = remain;
 		mpsse_xfer(data, 2, 0);
 	}
-
-
-	printf(" -- Remain: %u \n", mpsse_ftdic.readbuffer_remaining);
 }
 
