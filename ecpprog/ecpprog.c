@@ -513,6 +513,7 @@ static void read_status_register(){
 	data[0] = 0;
 	jtag_go_to_state(STATE_SHIFT_DR);
 	jtag_tap_shift(data, data, 32, true);
+	//jtag_go_to_state(STATE_PAUSE_DR);
 
 	uint32_t status = 0;
 	
@@ -552,7 +553,23 @@ void ecp_jtag_cmd(uint8_t cmd){
 	jtag_tap_shift(data, data, 8, true);
 
 	jtag_go_to_state(STATE_RUN_TEST_IDLE);
-	jtag_wait_time(10);	
+	jtag_wait_time(32);	
+}
+
+void ecp_jtag_cmd8(uint8_t cmd, uint8_t param){
+	uint8_t data[1] = {cmd};
+
+	jtag_go_to_state(STATE_SHIFT_IR);
+	jtag_tap_shift(data, data, 8, true);
+	jtag_go_to_state(STATE_PAUSE_IR);
+
+	data[0] = param;
+	jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data, data, 8, true);
+	jtag_go_to_state(STATE_PAUSE_DR);
+
+	jtag_go_to_state(STATE_RUN_TEST_IDLE);
+	jtag_wait_time(32);	
 }
 
 // ---------------------------------------------------------
@@ -921,18 +938,18 @@ int main(int argc, char **argv)
 	read_status_register();
 
 
-	/* Reset ECP5 to release SPI interface */
-	ecp_jtag_cmd(ISC_ENABLE);
-	ecp_jtag_cmd(ISC_ERASE);
-	ecp_jtag_cmd(ISC_DISABLE);
-
-	/* Put device into SPI bypass mode */
-	enter_spi_background_mode();
+	
 	//usleep(20000);
 
 	if (test_mode)
 	{
+		/* Reset ECP5 to release SPI interface */
+		ecp_jtag_cmd(ISC_ENABLE);
+		ecp_jtag_cmd(ISC_ERASE);
+		ecp_jtag_cmd(ISC_DISABLE);
 
+		/* Put device into SPI bypass mode */
+		enter_spi_background_mode();
 
 		flash_reset();
 		flash_read_id();
@@ -946,27 +963,78 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Not Supported yet\n");
 		fprintf(stderr, "reset..\n");
 
-		//sram_reset();
-		usleep(100);
 
-		//sram_chip_select();
-		usleep(2000);
 
+		uint8_t data[1] = {LSC_BITSTREAM_BURST};
+
+
+		fprintf(stderr, "status..\n");
+		read_status_register();
+
+		ecp_jtag_cmd8(ISC_ENABLE, 0);
+
+
+		ecp_jtag_cmd8(ISC_ERASE, 0);
 
 		// ---------------------------------------------------------
 		// Program
 		// ---------------------------------------------------------
 
 		fprintf(stderr, "programming..\n");
+
+
+	//	ecp_jtag_cmd(LSC_BITSTREAM_BURST);
+
+data[0] = LSC_BITSTREAM_BURST;
+	jtag_go_to_state(STATE_SHIFT_IR);
+	jtag_tap_shift(data, data, 8, true);
+
+	jtag_go_to_state(STATE_PAUSE_IR);
 		while (1) {
-			static unsigned char buffer[4096];
-			int rc = fread(buffer, 1, 4096, f);
+			const uint32_t len = 1024*1024;
+			static unsigned char buffer[1024*1024];
+			int rc = fread(buffer, 1, len, f);
 			if (rc <= 0)
 				break;
-			if (verbose)
-				fprintf(stderr, "sending %d bytes.\n", rc);
-			//mpsse_send_spi(buffer, rc);
+			//if (verbose)
+				//fprintf(stderr, "sending %d bytes.\n", rc);
+			
+
+				for(int i = 0; i < len; i++){
+					buffer[i] = bit_reverse(buffer[i]);
+				}
+
+				jtag_go_to_state(STATE_CAPTURE_DR);
+				jtag_tap_shift(buffer, buffer, len*8, true);
+				jtag_go_to_state(STATE_PAUSE_DR);
+
+		
+
+				/* Entering IDLE is essential */
+				//jtag_go_to_state(STATE_RUN_TEST_IDLE);
+
+
+				//read_status_register();
+
+				
 		}
+
+		ecp_jtag_cmd(ISC_DISABLE);
+		jtag_go_to_state(STATE_RUN_TEST_IDLE);
+		jtag_tap_shift(data, data, 8, true);
+
+		//jtag_wait_time(1000);
+
+
+		fprintf(stderr, "status..\n");
+		verbose = true;
+		read_status_register();
+
+
+
+//		jtag_wait_time(1000);
+
+
 
 		//mpsse_send_dummy_bytes(6);
 		//mpsse_send_dummy_bit();
@@ -980,9 +1048,15 @@ int main(int argc, char **argv)
 		// ---------------------------------------------------------
 
 		fprintf(stderr, "reset..\n");
+		/* Reset ECP5 to release SPI interface */
+		ecp_jtag_cmd(ISC_ENABLE);
+		ecp_jtag_cmd(ISC_ERASE);
+		ecp_jtag_cmd(ISC_DISABLE);
 
-		//flash_chip_deselect();
-		usleep(250000);
+		/* Put device into SPI bypass mode */
+		enter_spi_background_mode();
+		
+		usleep(25000);
 
 		
 

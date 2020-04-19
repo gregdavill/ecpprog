@@ -231,7 +231,7 @@ void jtag_tap_shift(
 	if(data_bits){
 		while(data_bits_sent != data_bits){
 
-			uint32_t _data_bits = MIN(4096 + 2048 + 1024, data_bits - data_bits_sent);
+			uint32_t _data_bits = MIN(4096 + 2048, data_bits - data_bits_sent);
 
 			jtag_shift_bytes(
 				input_data + data_bits_sent/8,
