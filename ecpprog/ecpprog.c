@@ -908,6 +908,7 @@ int main(int argc, char **argv)
 			perror(0);
 			return EXIT_FAILURE;
 		}
+		file_size = read_size;
 	} else {
 		f = (strcmp(filename, "-") == 0) ? stdin : fopen(filename, "rb");
 		if (f == NULL) {
