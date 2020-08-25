@@ -2,7 +2,7 @@
 #include <stdint.h>
 
 /* Not sure if all of these are applicable to the JTAG interface */
-enum lattice_cmd
+enum lattice_ecp5_cmd
 {
 	ISC_NOOP = 0xFF, /* 0 bits - Non-operation */
 	READ_ID = 0xE0, /* 24 bits - Read out the 32-bit IDCODE of the device */
@@ -45,12 +45,12 @@ enum lattice_cmd
 };
 
 
-struct ecp_device_id {
+struct device_id_pair {
 	const char* device_name;
 	uint32_t    device_id;
 };
 
-const struct ecp_device_id ecp_devices[] =
+const struct device_id_pair ecp_devices[] =
 {
 	{"LFE5U-12"   , 0x21111043 },
 	{"LFE5U-25"   , 0x41111043 },
@@ -62,4 +62,15 @@ const struct ecp_device_id ecp_devices[] =
 	{"LFE5UM5G-25", 0x81111043 },
 	{"LFE5UM5G-45", 0x81112043 },
 	{"LFE5UM5G-85", 0x81113043 }
+};
+
+const struct device_id_pair nx_devices[] =
+{
+	/* Crosslink NX */
+	{"LIFCL-17",    0x010F0043 },
+	{"LIFCL-40-ES", 0x010F1043 },
+	{"LIFCL-40",    0x110F1043 },
+	/* Certus NX */
+	{"LFD2NX-17",   0x310F0043 },
+	{"LFD2NX-40",   0x310F1043 },
 };

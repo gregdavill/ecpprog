@@ -47,6 +47,21 @@
 
 static bool verbose = false;
 
+enum device_type {
+	TYPE_NONE = 0,
+	TYPE_ECP5 = 1,
+	TYPE_NX = 2,
+};
+
+struct device_info {
+	const char* 	 name;
+	uint32_t    	 id;
+	enum device_type type;
+};
+
+static struct device_info connected_device = {0};
+
+
 // ---------------------------------------------------------
 // FLASH definitions
 // ---------------------------------------------------------
@@ -435,12 +450,27 @@ static void flash_disable_protection()
 // ECP5 specific JTAG functions
 // ---------------------------------------------------------
 
-
 static void print_idcode(uint32_t idcode){
-	for(int i = 0; i < sizeof(ecp_devices)/sizeof(struct ecp_device_id); i++){
+	connected_device.id = idcode;
+	
+	/* ECP5 Parts */
+	for(int i = 0; i < sizeof(ecp_devices)/sizeof(struct device_id_pair); i++){
 		if(idcode == ecp_devices[i].device_id)
 		{
+			connected_device.name = ecp_devices[i].device_name;
+			connected_device.type = TYPE_ECP5;
 			printf("IDCODE: 0x%08x (%s)\n", idcode ,ecp_devices[i].device_name);
+			return;
+		}
+	}
+
+	/* NX Parts */
+	for(int i = 0; i < sizeof(nx_devices)/sizeof(struct device_id_pair); i++){
+		if(idcode == nx_devices[i].device_id)
+		{
+			connected_device.name = nx_devices[i].device_name;
+			connected_device.type = TYPE_NX;
+			printf("IDCODE: 0x%08x (%s)\n", idcode ,nx_devices[i].device_name);
 			return;
 		}
 	}
@@ -467,8 +497,7 @@ static void read_idcode(){
 	print_idcode(idcode);
 }
 
-
-static void print_status_register(uint32_t status){	
+void print_ecp5_status_register(uint32_t status){	
 	printf("ECP5 Status Register: 0x%08x\n", status);
 
 	if(verbose){
@@ -510,6 +539,20 @@ static void print_status_register(uint32_t status){
 		printf("  Flow Through Mode:  %s\n",  status & (1 << 31) ? "Yes" : "No" );
 	}
 }
+
+void print_nx_status_register(uint32_t status){	
+	printf("NX Status Register: 0x%08x\n", status);
+}
+
+
+void print_status_register(uint32_t status){
+	if(connected_device.type == TYPE_ECP5){
+		print_ecp5_status_register(status);
+	}else if(connected_device.type == TYPE_NX){
+		print_nx_status_register(status);
+	}
+}
+
 
 
 static void read_status_register(){
