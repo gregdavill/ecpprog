@@ -916,7 +916,7 @@ int main(int argc, char **argv)
 		   named pipe, or contrarily, the standard input may be an
 		   ordinary file. */
 
-		if (!prog_sram && !check_mode) {
+		if (!prog_sram) {
 			if (fseek(f, 0L, SEEK_END) != -1) {
 				file_size = ftell(f);
 				if (file_size == -1) {
@@ -1130,7 +1130,7 @@ int main(int argc, char **argv)
 				uint8_t buffer[4096];
 
 				/* Show progress */
-				fprintf(stderr, "\r\033[0Kreading..    %04u/%04lu", addr, file_size);
+				fprintf(stderr, "\r\033[0Kreading..    %04u/%04u", addr + 4096, read_size);
 
 				flash_continue_read(buffer, 4096);
 				fwrite(buffer, read_size - addr > 4096 ? 4096 : read_size - addr, 1, f);
@@ -1139,7 +1139,7 @@ int main(int argc, char **argv)
 		} else if (!erase_mode && !disable_verify) {
 			
 			flash_start_read(rw_offset);
-			for (int addr = 0; addr < read_size; addr += 4096) {
+			for (int addr = 0; addr < file_size; addr += 4096) {
 				uint8_t buffer_flash[4096], buffer_file[4096];
 
 				int rc = fread(buffer_file, 1, 4096, f);
