@@ -182,7 +182,7 @@ static void flash_read_id()
 	 */
 
 	uint8_t data[260] = { FC_JEDECID };
-	int len = 5; // command + 4 response bytes
+	int len = 4; // command + 4 response bytes
 
 	if (verbose)
 		fprintf(stderr, "read flash ID..\n");
@@ -190,18 +190,6 @@ static void flash_read_id()
 	// Write command and read first 4 bytes
 	xfer_spi(data, len);
 
-	if (data[4] == 0xFF)
-		fprintf(stderr, "Extended Device String Length is 0xFF, "
-				"this is likely a read error. Ignorig...\n");
-	else {
-		// Read extended JEDEC ID bytes
-		if (data[4] != 0) {
-			len += data[4];
-			data[0] = FC_JEDECID;
-			xfer_spi(data, len);
-		}
-	}
-	
 	fprintf(stderr, "flash ID:");
 	for (int i = 1; i < len; i++)
 		fprintf(stderr, " 0x%02X", data[i]);
