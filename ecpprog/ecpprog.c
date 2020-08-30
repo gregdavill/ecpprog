@@ -614,7 +614,7 @@ void ecp_jtag_cmd8(uint8_t cmd, uint8_t param){
 
 static void help(const char *progname)
 {
-	fprintf(stderr, "Simple programming tool for FTDI-based Lattice ECP JTAG programmers.\n");
+	fprintf(stderr, "Simple programming tool for Lattice ECP5/NX using FTDI-based JTAG programmers.\n");
 	fprintf(stderr, "Usage: %s [-b|-n|-c] <input file>\n", progname);
 	fprintf(stderr, "       %s -r|-R<bytes> <output file>\n", progname);
 	fprintf(stderr, "       %s -S <input file>\n", progname);
