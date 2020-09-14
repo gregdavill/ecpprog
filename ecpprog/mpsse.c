@@ -140,7 +140,7 @@ void mpsse_xfer(uint8_t* data_buffer, uint16_t send_length, uint16_t receive_len
 	}
 }
 
-void mpsse_init(int ifnum, const char *devstr, bool slow_clock)
+void mpsse_init(int ifnum, const char *devstr, int clkdiv)
 {
 	enum ftdi_interface ftdi_ifnum = INTERFACE_A;
 
@@ -216,17 +216,10 @@ void mpsse_init(int ifnum, const char *devstr, bool slow_clock)
 
 	mpsse_send_byte(MC_TCK_X5);
 
-	if (slow_clock) {
-		// set 50 kHz clock
-		mpsse_send_byte(MC_SET_CLK_DIV);
-		mpsse_send_byte(29);
-		mpsse_send_byte(0x00);
-	} else {
-		// set 6 MHz clock
-		mpsse_send_byte(MC_SET_CLK_DIV);
-		mpsse_send_byte(1);
-		mpsse_send_byte(0x00);
-	}
+        // set clock - actual clock is 6MHz/(clkdiv)
+        mpsse_send_byte(MC_SET_CLK_DIV);
+        mpsse_send_byte((clkdiv-1) & 0xff);
+        mpsse_send_byte((clkdiv-1) >> 8);
 
 	mpsse_send_byte(MC_SETB_LOW);
 	mpsse_send_byte(0x08); /* Value */
