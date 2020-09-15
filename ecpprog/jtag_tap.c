@@ -130,9 +130,9 @@ void jtag_deinit(){
 /**
  * Performs any start-of-day tasks necessary to talk JTAG to our FPGA.
  */
-void jtag_init(int ifnum, const char *devstr, bool slow_clock)
+void jtag_init(int ifnum, const char *devstr, int clkdiv)
 {
-	mpsse_init(ifnum, devstr, slow_clock);
+	mpsse_init(ifnum, devstr, clkdiv);
 
 	jtag_set_current_state(STATE_TEST_LOGIC_RESET);
     jtag_go_to_state(STATE_TEST_LOGIC_RESET);
@@ -200,9 +200,6 @@ static void jtag_shift_bytes(
 	}
 	//printf("jtag_shift_bytes(0x%08x,0x%08x,%u,%s);\n",input_data, output_data, data_bits, must_end ? "true" : "false");
 	uint32_t byte_count = data_bits / 8;
-
-
-
 	data[0] = MC_DATA_OUT | MC_DATA_IN | MC_DATA_LSB | MC_DATA_OCN;
 	data[1] = (byte_count - 1); 
 	data[2] = (byte_count - 1) >> 8;        

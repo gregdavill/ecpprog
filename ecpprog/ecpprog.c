@@ -631,7 +631,10 @@ static void help(const char *progname)
 	fprintf(stderr, "  -o <offset in bytes>  start address for read/write [default: 0]\n");
 	fprintf(stderr, "                          (append 'k' to the argument for size in kilobytes,\n");
 	fprintf(stderr, "                          or 'M' for size in megabytes)\n");
-	fprintf(stderr, "  -s                    slow SPI (50 kHz instead of 6 MHz)\n");
+	fprintf(stderr, "  -k <divider>          divider for SPI clock [default: 1]\n");
+	fprintf(stderr, "                          clock speed is 6MHz/divider");
+	fprintf(stderr, "  -s                    slow SPI. (50 kHz instead of 6 MHz)\n");
+	fprintf(stderr, "                          Equivalent to -k 30\n");
 	fprintf(stderr, "  -v                    verbose output\n");
 	fprintf(stderr, "  -i [4,32,64]          select erase block size [default: 64k]\n");
 	fprintf(stderr, "\n");
@@ -685,6 +688,7 @@ int main(int argc, char **argv)
 	int erase_block_size = 64;
 	int erase_size = 0;
 	int rw_offset = 0;
+	int clkdiv = 1;
 
 	bool read_mode = false;
 	bool check_mode = false;
@@ -693,7 +697,6 @@ int main(int argc, char **argv)
 	bool dont_erase = false;
 	bool prog_sram = false;
 	bool test_mode = false;
-	bool slow_clock = false;
 	bool disable_protect = false;
 	bool disable_verify = false;
 	const char *filename = NULL;
@@ -713,7 +716,7 @@ int main(int argc, char **argv)
 	/* Decode command line parameters */
 	int opt;
 	char *endptr;
-	while ((opt = getopt_long(argc, argv, "d:i:I:rR:e:o:cbnStvspX", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "d:i:I:rR:e:o:k:scbnStvpX", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'd': /* device string */
 			devstr = optarg;
@@ -788,6 +791,16 @@ int main(int argc, char **argv)
 				return EXIT_FAILURE;
 			}
 			break;
+		case 'k': /* set clock div */
+			clkdiv = strtol(optarg, &endptr, 0);
+                        if (clkdiv < 1 || clkdiv > 65536) {
+				fprintf(stderr, "%s: clock divider must be in range 1-65536 `%s' is not a valid divider\n", my_name, optarg);
+				return EXIT_FAILURE;
+                        }
+			break;
+		case 's': /* use slow SPI clock */
+			clkdiv = 30;
+			break;
 		case 'c': /* do not write just check */
 			check_mode = true;
 			break;
@@ -805,9 +818,6 @@ int main(int argc, char **argv)
 			break;
 		case 'v': /* provide verbose output */
 			verbose = true;
-			break;
-		case 's': /* use slow SPI clock */
-			slow_clock = true;
 			break;
 		case 'p': /* disable flash protect before erase/write */
 			disable_protect = true;
@@ -965,7 +975,7 @@ int main(int argc, char **argv)
 	// ---------------------------------------------------------
 
 	fprintf(stderr, "init..\n");
-	jtag_init(ifnum, devstr, slow_clock);
+	jtag_init(ifnum, devstr, clkdiv);
 
 	read_idcode();
 	read_status_register();

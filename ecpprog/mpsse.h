@@ -113,7 +113,7 @@ int mpsse_readb_low(void);
 int mpsse_readb_high(void);
 void mpsse_send_dummy_bytes(uint8_t n);
 void mpsse_send_dummy_bit(void);
-void mpsse_init(int ifnum, const char *devstr, bool slow_clock);
+void mpsse_init(int ifnum, const char *devstr, int clkdiv);
 void mpsse_close(void);
 
 #endif /* MPSSE_H */
