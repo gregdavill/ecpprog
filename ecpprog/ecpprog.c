@@ -983,12 +983,12 @@ int main(int argc, char **argv)
 			if (verbose)
 				fprintf(stderr, "sending %d bytes.\n", rc);
 
-			for(int i = 0; i < len; i++){
+			for(int i = 0; i < rc; i++){
 				buffer[i] = bit_reverse(buffer[i]);
 			}
 
 			jtag_go_to_state(STATE_CAPTURE_DR);
-			jtag_tap_shift(buffer, buffer, len*8, false);
+			jtag_tap_shift(buffer, buffer, rc*8, false);
 		}
 	
 		ecp_jtag_cmd(ISC_DISABLE);
