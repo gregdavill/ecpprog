@@ -146,7 +146,7 @@ extern struct ftdi_context mpsse_ftdic;
 
 static inline void jtag_pulse_clock_and_read_tdo(bool tms, bool tdi)
 {
-    *ptr++ = MC_DATA_TMS | MC_DATA_IN | MC_DATA_LSB | MC_DATA_BITS | MC_DATA_OCN;
+    *ptr++ = MC_DATA_TMS | MC_DATA_IN | MC_DATA_LSB | MC_DATA_BITS | MC_DATA_OCN | MC_DATA_ICN;
 	*ptr++ =  0;        
     *ptr++ = (tdi ? 0x80 : 0) | (tms ? 0x01 : 0);
 	rx_cnt++;
@@ -200,7 +200,7 @@ static void jtag_shift_bytes(
 	}
 	//printf("jtag_shift_bytes(0x%08x,0x%08x,%u,%s);\n",input_data, output_data, data_bits, must_end ? "true" : "false");
 	uint32_t byte_count = data_bits / 8;
-	data[0] = MC_DATA_OUT | MC_DATA_IN | MC_DATA_LSB | MC_DATA_OCN;
+	data[0] = MC_DATA_OUT | MC_DATA_IN | MC_DATA_LSB | MC_DATA_OCN | MC_DATA_ICN;
 	data[1] = (byte_count - 1); 
 	data[2] = (byte_count - 1) >> 8;        
 	memcpy(data + 3, input_data, byte_count);
@@ -270,7 +270,7 @@ void jtag_go_to_state(unsigned state)
 		}
 
 		uint8_t data[3] = { 
-			MC_DATA_TMS | MC_DATA_LSB | MC_DATA_BITS,
+			MC_DATA_TMS | MC_DATA_LSB | MC_DATA_BITS | MC_DATA_ICN,
 			5 - 1,
 			0b11111
 		};
