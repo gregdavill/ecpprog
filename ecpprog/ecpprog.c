@@ -528,40 +528,141 @@ void print_ecp5_status_register(uint32_t status){
 	}
 }
 
-void print_nx_status_register(uint32_t status){	
-	printf("NX Status Register: 0x%08x\n", status);
-}
+void print_nx_status_register(uint64_t status){	
+	printf("NX Status Register: 0x%016lx\n", status);
 
+	if(verbose){
+		printf("  Transparent Mode:   %s\n",  status & (1 << 0)  ? "Yes" : "No" );
+		printf("  Config Target:      ");
+		uint8_t config_target = status & (0b111 << 1) >> 1;
+		switch (config_target){
+			case 0b000: printf("SRAM (0b000)\n"); break;
+			case 0b001: printf("EFUSE Normal (0b001)\n"); break;
+			case 0b010: printf("EFUSE Pseudo (0b010)\n"); break;
+			case 0b011: printf("EFUSE Safe (0b011)\n"); break;
+			default: printf("Invalid (%u)\n", config_target); break;
+		}
 
-void print_status_register(uint32_t status){
-	if(connected_device.type == TYPE_ECP5){
-		print_ecp5_status_register(status);
-	}else if(connected_device.type == TYPE_NX){
-		print_nx_status_register(status);
+		printf("  JTAG Active:        %s\n",  status & (1 << 4)  ? "Yes" : "No" );
+		printf("  PWD Protection:     %s\n",  status & (1 << 5)  ? "Yes" : "No" );
+		printf("  OTP:                %s\n",  status & (1 << 6)  ? "Yes" : "No" );
+		printf("  DONE:               %s\n",  status & (1 << 8)  ? "Yes" : "No" );
+		printf("  ISC Enable:         %s\n",  status & (1 << 9)  ? "Yes" : "No" );
+		printf("  Write Enable:       %s\n",  status & (1 << 10) ? "Writable" : "Not Writable");
+		printf("  Read Enable:        %s\n",  status & (1 << 11) ? "Readable" : "Not Readable");
+		printf("  Busy Flag:          %s\n",  status & (1 << 12) ? "Yes" : "No" );
+		printf("  Fail Flag:          %s\n",  status & (1 << 13) ? "Yes" : "No" );
+		printf("  Decrypt Only:       %s\n",  status & (1 << 15) ? "Yes" : "No" );
+		printf("  PWD Enable:         %s\n",  status & (1 << 16) ? "Yes" : "No" );
+		printf("  PWD All:            %s\n",  status & (1 << 17) ? "Yes" : "No" );
+		printf("  CID EN:             %s\n",  status & (1 << 18) ? "Yes" : "No" );
+		printf("  Encrypt Preamble:   %s\n",  status & (1 << 21) ? "Yes" : "No" );
+		printf("  Std Preamble:       %s\n",  status & (1 << 22) ? "Yes" : "No" );
+		printf("  SPIm Fail 1:        %s\n",  status & (1 << 23) ? "Yes" : "No" );
+		
+		uint8_t bse_error = (status & (0b1111 << 24)) >> 24;
+		switch (bse_error){
+			case 0b0000: printf("  BSE Error Code:     No Error (0b000)\n"); break;
+			case 0b0001: printf("  BSE Error Code:     ID Error (0b001)\n"); break;
+			case 0b0010: printf("  BSE Error Code:     CMD Error - illegal command (0b010)\n"); break;
+			case 0b0011: printf("  BSE Error Code:     CRC Error (0b011)\n"); break;
+			case 0b0100: printf("  BSE Error Code:     PRMB Error - preamble error (0b100)\n"); break;
+			case 0b0101: printf("  BSE Error Code:     ABRT Error - configuration aborted by the user (0b101)\n"); break;
+			case 0b0110: printf("  BSE Error Code:     OVFL Error - data overflow error (0b110)\n"); break;
+			case 0b0111: printf("  BSE Error Code:     SDM Error - bitstream pass the size of SRAM array (0b111)\n"); break;
+			case 0b1000: printf("  BSE Error Code:     Authentication Error (0b1000)\n"); break;
+			case 0b1001: printf("  BSE Error Code:     Authentication Setup Error (0b1001)\n"); break;
+			case 0b1010: printf("  BSE Error Code:     Bitstream Engine Timeout Error (0b1010) \n"); break;
+		}
+
+		printf("  Execution Error:    %s\n",  status & (1 << 28) ? "Yes" : "No" );
+		printf("  ID Error:           %s\n",  status & (1 << 29) ? "Yes" : "No" );
+		printf("  Invalid Command:    %s\n",  status & (1 << 30) ? "Yes" : "No" );
+		printf("  WDT Busy:           %s\n",  status & (1 << 31) ? "Yes" : "No" );
+		printf("  Dry Run DONE:       %s\n",  status & (1UL << 33) ? "Yes" : "No" );
+		
+		uint8_t bse_error1 = (status & (0b1111UL << 34)) >> 34;
+		switch (bse_error1){
+			case 0b0000: printf("  BSE Error 1 Code: (Previous Bitstream)  No Error (0b000)\n"); break;
+			case 0b0001: printf("  BSE Error 1 Code: (Previous Bitstream)  ID Error (0b001)\n"); break;
+			case 0b0010: printf("  BSE Error 1 Code: (Previous Bitstream)  CMD Error - illegal command (0b010)\n"); break;
+			case 0b0011: printf("  BSE Error 1 Code: (Previous Bitstream)  CRC Error (0b011)\n"); break;
+			case 0b0100: printf("  BSE Error 1 Code: (Previous Bitstream)  PRMB Error - preamble error (0b100)\n"); break;
+			case 0b0101: printf("  BSE Error 1 Code: (Previous Bitstream)  ABRT Error - configuration aborted by the user (0b101)\n"); break;
+			case 0b0110: printf("  BSE Error 1 Code: (Previous Bitstream)  OVFL Error - data overflow error (0b110)\n"); break;
+			case 0b0111: printf("  BSE Error 1 Code: (Previous Bitstream)  SDM Error - bitstream pass the size of SRAM array (0b111)\n"); break;
+			case 0b1000: printf("  BSE Error 1 Code: (Previous Bitstream)  Authentication Error (0b1000)\n"); break;
+			case 0b1001: printf("  BSE Error 1 Code: (Previous Bitstream)  Authentication Setup Error (0b1001)\n"); break;
+			case 0b1010: printf("  BSE Error 1 Code: (Previous Bitstream)  Bitstream Engine Timeout Error (0b1010) \n"); break;
+		}
+
+		printf("  Bypass Mode:        %s\n",  status & (1UL << 38) ? "Yes" : "No" );
+		printf("  Flow Through Mode:  %s\n",  status & (1UL << 39) ? "Yes" : "No" );
+		printf("  SFDP Timeout:       %s\n",  status & (1UL << 42) ? "Yes" : "No" );
+		printf("  Key Destroy Pass:   %s\n",  status & (1UL << 43) ? "Yes" : "No" );
+		printf("  INITN:              %s\n",  status & (1UL << 44) ? "Yes" : "No" );
+		printf("  I3C Parity Error 2: %s\n",  status & (1UL << 45) ? "Yes" : "No" );
+		printf("  Init Bus ID Error:  %s\n",  status & (1UL << 46) ? "Yes" : "No" );
+		printf("  I3C Parity Error 1: %s\n",  status & (1UL << 47) ? "Yes" : "No" );
+		
+		uint8_t auth_mode = (status & (0b11UL << 48)) >> 48;
+		switch (auth_mode){
+			case 0b00: printf("  Authentication Mode:  No Auth (0b00)\n"); break;
+			case 0b01: printf("  Authentication Mode:  ECDSA (0b01)\n"); break;
+			case 0b10: printf("  Authentication Mode:  HMAC (0b10)\n"); break;
+			case 0b11: printf("  Authentication Mode:  No Auth (0b11)\n"); break;
+		}
+
+		printf("  Authentication Done: %s\n",  status & (1UL << 50) ? "Yes" : "No" );
+		printf("  Dry Run Authentication Done: %s\n",  status & (1UL << 51) ? "Yes" : "No" );
+		printf("  JTAG Locked:         %s\n",  status & (1UL << 52) ? "Yes" : "No" );
+		printf("  SSPI Locked:         %s\n",  status & (1UL << 53) ? "Yes" : "No" );
+		printf("  I2C/I3C Locked:      %s\n",  status & (1UL << 54) ? "Yes" : "No" );
+		printf("  PUB Read Lock:       %s\n",  status & (1UL << 55) ? "Yes" : "No" );
+		printf("  PUB Write Lock:      %s\n",  status & (1UL << 56) ? "Yes" : "No" );
+		printf("  FEA Read Lock:       %s\n",  status & (1UL << 57) ? "Yes" : "No" );
+		printf("  FEA Write Lock:      %s\n",  status & (1UL << 58) ? "Yes" : "No" );
+		printf("  AES Read Lock:       %s\n",  status & (1UL << 59) ? "Yes" : "No" );
+		printf("  AES Write Lock:      %s\n",  status & (1UL << 60) ? "Yes" : "No" );
+		printf("  PWD Read Lock:       %s\n",  status & (1UL << 61) ? "Yes" : "No" );
+		printf("  PWD Write Lock:      %s\n",  status & (1UL << 62) ? "Yes" : "No" );
+		printf("  Global Lock:         %s\n",  status & (1UL << 63) ? "Yes" : "No" );
 	}
+
 }
-
-
 
 static void read_status_register(){
 
-	uint8_t data[4] = {LSC_READ_STATUS};
+	uint8_t data[8] = {LSC_READ_STATUS};
 
 	jtag_go_to_state(STATE_SHIFT_IR);
 	jtag_tap_shift(data, data, 8, true);
 
 	data[0] = 0;
 	jtag_go_to_state(STATE_SHIFT_DR);
-	jtag_tap_shift(data, data, 32, true);
 	//jtag_go_to_state(STATE_PAUSE_DR);
-
-	uint32_t status = 0;
 	
-	/* Format the IDCODE into a 32bit value */
-	for(int i = 0; i< 4; i++)
-		status = data[i] << 24 | status >> 8;
+	if(connected_device.type == TYPE_ECP5){
+		jtag_tap_shift(data, data, 32, true);
+		uint32_t status = 0;
+		
+		/* Format the status into a 32bit value */
+		for(int i = 0; i< 4; i++)
+			status = data[i] << 24 | status >> 8;
 
-	print_status_register(status);
+		print_ecp5_status_register(status);
+	}else if(connected_device.type == TYPE_NX){
+
+		jtag_tap_shift(data, data, 64, true);
+
+		uint64_t status = 0;
+		
+		/* Format the status into a 32bit value */
+		for(int i = 0; i< 8; i++)
+			status = (uint64_t)data[i] << 56 | status >> 8;
+
+		print_nx_status_register(status);
+	}
 }
 
 
@@ -984,8 +1085,10 @@ int main(int argc, char **argv)
 	if (test_mode)
 	{
 		/* Reset ECP5 to release SPI interface */
-		ecp_jtag_cmd(ISC_ENABLE);
-		ecp_jtag_cmd(ISC_ERASE);
+		ecp_jtag_cmd8(ISC_ENABLE,0);
+		usleep(10000);
+		ecp_jtag_cmd8(ISC_ERASE,0);
+		usleep(10000);
 		ecp_jtag_cmd(ISC_DISABLE);
 
 		/* Put device into SPI bypass mode */
