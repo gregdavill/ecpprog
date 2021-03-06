@@ -656,7 +656,7 @@ int main(int argc, char **argv)
 	int erase_size = 0;
 	int rw_offset = 0;
 
-	bool reinitialize = true;
+	bool reinitialize = false;
 	bool read_mode = false;
 	bool check_mode = false;
 	bool erase_mode = false;
