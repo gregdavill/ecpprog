@@ -603,6 +603,7 @@ static void help(const char *progname)
 	fprintf(stderr, "  -s                    slow SPI (50 kHz instead of 6 MHz)\n");
 	fprintf(stderr, "  -v                    verbose output\n");
 	fprintf(stderr, "  -i [4,32,64]          select erase block size [default: 64k]\n");
+	fprintf(stderr, "  -a                    reinitialize the device after any operation\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Mode of operation:\n");
 	fprintf(stderr, "  [default]             write file contents to flash, then verify\n");
@@ -655,6 +656,7 @@ int main(int argc, char **argv)
 	int erase_size = 0;
 	int rw_offset = 0;
 
+	bool reinitialize = false;
 	bool read_mode = false;
 	bool check_mode = false;
 	bool erase_mode = false;
@@ -682,7 +684,7 @@ int main(int argc, char **argv)
 	/* Decode command line parameters */
 	int opt;
 	char *endptr;
-	while ((opt = getopt_long(argc, argv, "d:i:I:rR:e:o:cbnStvspX", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "d:i:I:rR:e:o:cabnStvspX", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'd': /* device string */
 			devstr = optarg;
@@ -759,6 +761,9 @@ int main(int argc, char **argv)
 			break;
 		case 'c': /* do not write just check */
 			check_mode = true;
+			break;
+		case 'a': /* reinitialize ECP5 device reading new configuration */
+			reinitialize = true;
 			break;
 		case 'b': /* bulk erase before writing */
 			bulk_erase = true;
@@ -1128,6 +1133,11 @@ int main(int argc, char **argv)
 			}
 			fprintf(stderr, "  VERIFY OK\n");
 		}
+	}
+
+	if (reinitialize) {
+		fprintf(stderr, "rebooting ECP5...\n");
+		ecp_jtag_cmd(LSC_REFRESH);
 	}
 
 	if (f != NULL && f != stdin && f != stdout)
