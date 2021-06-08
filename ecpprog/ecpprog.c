@@ -196,7 +196,18 @@ static void flash_read_id()
 static void flash_reset()
 {
 	uint8_t data[8] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-	xfer_spi(data, 8);
+
+	// This disables CRM is if it was enabled
+	jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data, data, 64, true);
+
+	// This disables QPI if it was enabled
+	jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data, data, 2, true);
+
+	// This issues a flash reset command
+	jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data, data, 8, true);
 }
 
 static uint8_t read_status_1(){
