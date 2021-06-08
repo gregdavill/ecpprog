@@ -135,7 +135,7 @@ void jtag_init(int ifnum, const char *devstr, bool slow_clock)
 	mpsse_init(ifnum, devstr, slow_clock);
 
 	jtag_set_current_state(STATE_TEST_LOGIC_RESET);
-    jtag_go_to_state(STATE_TEST_LOGIC_RESET);
+	jtag_go_to_state(STATE_TEST_LOGIC_RESET);
 }
 
 uint8_t data[32*1024];
@@ -146,9 +146,9 @@ extern struct ftdi_context mpsse_ftdic;
 
 static inline void jtag_pulse_clock_and_read_tdo(bool tms, bool tdi)
 {
-    *ptr++ = MC_DATA_TMS | MC_DATA_IN | MC_DATA_LSB | MC_DATA_BITS | MC_DATA_OCN;
+	*ptr++ = MC_DATA_TMS | MC_DATA_IN | MC_DATA_LSB | MC_DATA_BITS | MC_DATA_OCN;
 	*ptr++ =  0;        
-    *ptr++ = (tdi ? 0x80 : 0) | (tms ? 0x01 : 0);
+	*ptr++ = (tdi ? 0x80 : 0) | (tms ? 0x01 : 0);
 	rx_cnt++;
 }
 
@@ -168,9 +168,9 @@ static void _jtag_tap_shift(
 	for (uint32_t i = 0; i < byte_count; ++i) {
 		uint8_t byte_out = input_data[i];
 		for (int j = 0; j < 8 && bit_count-- > 0; ++j) {
-            bool tms = false;
+			bool tms = false;
 			if (bit_count == 0 && must_end) {
-                tms = true;
+				tms = true;
 				jtag_state_ack(1);
 			}
 			jtag_pulse_clock_and_read_tdo(tms, byte_out & 1);
