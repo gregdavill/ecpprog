@@ -214,7 +214,7 @@ static void jtag_shift_bytes(
 }
 
 
-#define MIN(a,b) (a < b) ? a : b
+#define MIN(a,b) ((a) < (b)) ? (a) : (b)
 
 void jtag_tap_shift(
 	uint8_t *input_data,
