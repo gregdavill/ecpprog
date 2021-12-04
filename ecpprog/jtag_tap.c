@@ -213,8 +213,9 @@ static void jtag_shift_bytes(
 	memcpy(output_data, data, byte_count);
 }
 
-
-#define MIN(a,b) ((a) < (b)) ? (a) : (b)
+#ifndef MIN
+	#define MIN(a,b) ((a) < (b)) ? (a) : (b)
+#endif
 
 void jtag_tap_shift(
 	uint8_t *input_data,
