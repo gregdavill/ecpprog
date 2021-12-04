@@ -199,7 +199,18 @@ static void flash_read_id()
 static void flash_reset()
 {
 	uint8_t data[8] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-	xfer_spi(data, 8);
+
+	// This disables CRM is if it was enabled
+	jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data, data, 64, true);
+
+	// This disables QPI if it was enabled
+	jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data, data, 2, true);
+
+	// This issues a flash reset command
+	jtag_go_to_state(STATE_SHIFT_DR);
+	jtag_tap_shift(data, data, 8, true);
 }
 
 static uint8_t read_status_1(){
@@ -738,6 +749,7 @@ static void help(const char *progname)
 	fprintf(stderr, "                          Equivalent to -k 30\n");
 	fprintf(stderr, "  -v                    verbose output\n");
 	fprintf(stderr, "  -i [4,32,64]          select erase block size [default: 64k]\n");
+	fprintf(stderr, "  -a                    reinitialize the device after any operation\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Mode of operation:\n");
 	fprintf(stderr, "  [default]             write file contents to flash, then verify\n");
@@ -791,6 +803,7 @@ int main(int argc, char **argv)
 	int rw_offset = 0;
 	int clkdiv = 1;
 
+	bool reinitialize = false;
 	bool read_mode = false;
 	bool check_mode = false;
 	bool erase_mode = false;
@@ -904,6 +917,9 @@ int main(int argc, char **argv)
 			break;
 		case 'c': /* do not write just check */
 			check_mode = true;
+			break;
+		case 'a': /* reinitialize ECP5 device reading new configuration */
+			reinitialize = true;
 			break;
 		case 'b': /* bulk erase before writing */
 			bulk_erase = true;
@@ -1272,6 +1288,11 @@ int main(int argc, char **argv)
 			}
 			fprintf(stderr, "  VERIFY OK\n");
 		}
+	}
+
+	if (reinitialize) {
+		fprintf(stderr, "rebooting ECP5...\n");
+		ecp_jtag_cmd(LSC_REFRESH);
 	}
 
 	if (f != NULL && f != stdin && f != stdout)

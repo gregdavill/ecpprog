@@ -135,7 +135,7 @@ void jtag_init(int ifnum, const char *devstr, int clkdiv)
 	mpsse_init(ifnum, devstr, clkdiv);
 
 	jtag_set_current_state(STATE_TEST_LOGIC_RESET);
-    jtag_go_to_state(STATE_TEST_LOGIC_RESET);
+	jtag_go_to_state(STATE_TEST_LOGIC_RESET);
 }
 
 uint8_t data[32*1024];
@@ -146,9 +146,9 @@ extern struct ftdi_context mpsse_ftdic;
 
 static inline void jtag_pulse_clock_and_read_tdo(bool tms, bool tdi)
 {
-    *ptr++ = MC_DATA_TMS | MC_DATA_IN | MC_DATA_LSB | MC_DATA_BITS | MC_DATA_OCN | MC_DATA_ICN;
+  *ptr++ = MC_DATA_TMS | MC_DATA_IN | MC_DATA_LSB | MC_DATA_BITS | MC_DATA_OCN | MC_DATA_ICN;
 	*ptr++ =  0;        
-    *ptr++ = (tdi ? 0x80 : 0) | (tms ? 0x01 : 0);
+	*ptr++ = (tdi ? 0x80 : 0) | (tms ? 0x01 : 0);
 	rx_cnt++;
 }
 
@@ -168,9 +168,9 @@ static void _jtag_tap_shift(
 	for (uint32_t i = 0; i < byte_count; ++i) {
 		uint8_t byte_out = input_data[i];
 		for (int j = 0; j < 8 && bit_count-- > 0; ++j) {
-            bool tms = false;
+			bool tms = false;
 			if (bit_count == 0 && must_end) {
-                tms = true;
+				tms = true;
 				jtag_state_ack(1);
 			}
 			jtag_pulse_clock_and_read_tdo(tms, byte_out & 1);
@@ -211,7 +211,7 @@ static void jtag_shift_bytes(
 }
 
 #ifndef MIN
-#define MIN(a,b) (a < b) ? a : b
+	#define MIN(a,b) ((a) < (b)) ? (a) : (b)
 #endif
 
 void jtag_tap_shift(
@@ -222,31 +222,27 @@ void jtag_tap_shift(
 {
 	/* if 'must_end' the send last byte seperately 
 	 * This way we toggle TMS on the last clock cycle */
-	if(must_end)
-		data_bits -= 8;
-	
-	uint32_t data_bits_sent = 0;
-	if(data_bits){
-		while(data_bits_sent != data_bits){
 
-			uint32_t _data_bits = MIN(4096 + 2048, data_bits - data_bits_sent);
+	while (data_bits >= (8 + must_end)) {
+		uint32_t _data_bits = MIN(4096 + 2048, data_bits - must_end) & ~7U;
 
-			jtag_shift_bytes(
-				input_data + data_bits_sent/8,
-				output_data + data_bits_sent/8,
-				_data_bits,
-				false
-			);
-			data_bits_sent += _data_bits;
-		}
+		jtag_shift_bytes(
+			input_data,
+			output_data,
+			_data_bits,
+			false
+		);
+
+		data_bits   -= _data_bits;
+		input_data  += _data_bits / 8;
+		output_data += _data_bits / 8;
 	}
 
-	/* Send our last byte */
-	if(must_end){
+	if (data_bits > 0) {
 		_jtag_tap_shift(
-			input_data + data_bits_sent/8,
-			output_data + data_bits_sent/8,
-			8,
+			input_data,
+			output_data,
+			data_bits,
 			must_end
 		);
 	}
