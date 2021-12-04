@@ -1,11 +1,11 @@
 # ecpprog
 
-A basic driver for FTDI based JTAG probes, to program ECP5 FPGAs.
+A basic driver for FTDI based JTAG probes (FT232H, FT2232H, FT4232H), to program Lattice ECP5/Nexus FPGAs.
 
 ## Features:
- - Flash programing via JTAG link to ECP5 part.
- - Validate ECP5 IDCODEs
- - Read/Decode ECP5 status register
+ - SPI Flash programing via JTAG link to ECP5/NX part.
+ - Validate ECP5/NX IDCODEs
+ - Read/Decode ECP5/NX status register
 
 ## Prerequisites
 
@@ -65,7 +65,7 @@ $ ecpprog -o 1M firmware.bin
   erase 64kB sector at 0x130000..
   erase 64kB sector at 0x140000..
   programming..  294312/294312
-  verify..       262144/294312  VERIFY OK
+  verify..       294312/294312  VERIFY OK
   Bye.
 
 ```
