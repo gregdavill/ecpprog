@@ -73,4 +73,6 @@ const struct device_id_pair nx_devices[] =
 	/* Certus NX */
 	{"LFD2NX-17",   0x310F0043 },
 	{"LFD2NX-40",   0x310F1043 },
+	/* Certus Pro NX */
+	{"LFCPNX-100",  0x010F4043 },
 };
