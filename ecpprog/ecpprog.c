@@ -1163,7 +1163,9 @@ int main(int argc, char **argv)
 		fprintf(stderr, "reset..\n");
 		/* Reset ECP5 to release SPI interface */
 		ecp_jtag_cmd8(ISC_ENABLE, 0);
+		usleep(10000);
 		ecp_jtag_cmd8(ISC_ERASE, 0);
+		usleep(10000);
 		ecp_jtag_cmd8(ISC_DISABLE, 0);
 
 		/* Put device into SPI bypass mode */
