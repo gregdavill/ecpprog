@@ -1121,7 +1121,9 @@ int main(int argc, char **argv)
 		// Reset
 		// ---------------------------------------------------------
 		fprintf(stderr, "reset..\n");
-
+		if(connected_device.type == TYPE_NX){
+			ecp_jtag_cmd(LSC_REFRESH);
+		}
 		ecp_jtag_cmd8(ISC_ENABLE, 0);
 		ecp_jtag_cmd8(ISC_ERASE, 0);
 		ecp_jtag_cmd8(LSC_RESET_CRC, 0);
