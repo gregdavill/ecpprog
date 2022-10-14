@@ -1291,8 +1291,11 @@ int main(int argc, char **argv)
 	}
 
 	if (reinitialize) {
-		fprintf(stderr, "rebooting ECP5...\n");
+		fprintf(stderr, "rebooting FPGA...\n");
 		ecp_jtag_cmd(LSC_REFRESH);
+		if(connected_device.type == TYPE_NX){
+			ecp_jtag_cmd(ISC_NOOP);
+		}
 	}
 
 	if (f != NULL && f != stdin && f != stdout)
