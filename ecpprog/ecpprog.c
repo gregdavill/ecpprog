@@ -1121,7 +1121,9 @@ int main(int argc, char **argv)
 		// Reset
 		// ---------------------------------------------------------
 		fprintf(stderr, "reset..\n");
-
+		if(connected_device.type == TYPE_NX){
+			ecp_jtag_cmd(LSC_REFRESH);
+		}
 		ecp_jtag_cmd8(ISC_ENABLE, 0);
 		ecp_jtag_cmd8(ISC_ERASE, 0);
 		ecp_jtag_cmd8(LSC_RESET_CRC, 0);
@@ -1163,7 +1165,9 @@ int main(int argc, char **argv)
 		fprintf(stderr, "reset..\n");
 		/* Reset ECP5 to release SPI interface */
 		ecp_jtag_cmd8(ISC_ENABLE, 0);
+		usleep(10000);
 		ecp_jtag_cmd8(ISC_ERASE, 0);
+		usleep(10000);
 		ecp_jtag_cmd8(ISC_DISABLE, 0);
 
 		/* Put device into SPI bypass mode */
@@ -1291,8 +1295,11 @@ int main(int argc, char **argv)
 	}
 
 	if (reinitialize) {
-		fprintf(stderr, "rebooting ECP5...\n");
+		fprintf(stderr, "rebooting FPGA...\n");
 		ecp_jtag_cmd(LSC_REFRESH);
+		if(connected_device.type == TYPE_NX){
+			ecp_jtag_cmd(ISC_NOOP);
+		}
 	}
 
 	if (f != NULL && f != stdin && f != stdout)
