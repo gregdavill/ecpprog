@@ -373,7 +373,7 @@ static void flash_start_read(int addr)
 static void flash_continue_read(uint8_t *data, int n)
 {
 	if (verbose)
-		fprintf(stderr, "Contiune Read +0x%03X..\n", n);
+		fprintf(stderr, "Continue Read +0x%03X..\n", n);
 
 	memset(data, 0, n);
 	send_spi(data, n);
@@ -758,6 +758,9 @@ static void help(const char *progname)
 	fprintf(stderr, "  -R <size in bytes>    read the specified number of bytes from flash\n");
 	fprintf(stderr, "                          (append 'k' to the argument for size in kilobytes,\n");
 	fprintf(stderr, "                          or 'M' for size in megabytes)\n");
+	fprintf(stderr, "  -l                    Verify every written page immediately after write\n");
+	fprintf(stderr, "                          This make the total write/verify process slower but allows\n");
+	fprintf(stderr, "                          discovery of flash programming/connection issues quicker\n");
 	fprintf(stderr, "  -c                    do not write flash, only verify (`check')\n");
 	fprintf(stderr, "  -S                    perform SRAM programming\n");
 	fprintf(stderr, "  -t                    just read the flash ID sequence\n");
@@ -806,6 +809,7 @@ int main(int argc, char **argv)
 	bool reinitialize = false;
 	bool read_mode = false;
 	bool check_mode = false;
+	bool interleaved_verify = false;
 	bool erase_mode = false;
 	bool bulk_erase = false;
 	bool dont_erase = false;
@@ -830,7 +834,7 @@ int main(int argc, char **argv)
 	/* Decode command line parameters */
 	int opt;
 	char *endptr;
-	while ((opt = getopt_long(argc, argv, "d:i:I:rR:e:o:k:scabnStvpX", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "d:i:I:rR:e:o:k:slcabnStvpX", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'd': /* device string */
 			devstr = optarg;
@@ -915,6 +919,9 @@ int main(int argc, char **argv)
 		case 's': /* use slow SPI clock */
 			clkdiv = 30;
 			break;
+		case 'l': /* Check every page after write */
+			interleaved_verify = true;
+			break;
 		case 'c': /* do not write just check */
 			check_mode = true;
 			break;
@@ -986,6 +993,11 @@ int main(int argc, char **argv)
 
 	if (rw_offset != 0 && test_mode) {
 		fprintf(stderr, "%s: option `-o' not supported in test mode\n", my_name);
+		return EXIT_FAILURE;
+	}
+
+	if (interleaved_verify && (read_mode || check_mode || prog_sram || test_mode)) {
+		fprintf(stderr, "%s: option `-l' only valid in programming mode\n", my_name);
 		return EXIT_FAILURE;
 	}
 
@@ -1177,6 +1189,7 @@ int main(int argc, char **argv)
 		// ---------------------------------------------------------
 		// Program
 		// ---------------------------------------------------------
+		unsigned int read_blocksize = 256 * 32;
 
 		if (!read_mode && !check_mode)
 		{
@@ -1227,19 +1240,38 @@ int main(int argc, char **argv)
 
 			if (!erase_mode)
 			{
+				uint8_t buffer_flash[read_blocksize], buffer_file[read_blocksize], buffer_tx[256];
 				for (int rc, addr = 0; true; addr += rc) {
-					uint8_t buffer[256];
-
-					/* Show progress */
-					fprintf(stderr, "\r\033[0Kprogramming..  %04u/%04lu", addr, file_size);
-
-					int page_size = 256 - (rw_offset + addr) % 256;
-					rc = fread(buffer, 1, page_size, f);
+					rc = fread(buffer_file, 1, read_blocksize, f);
 					if (rc <= 0)
 						break;
-					flash_write_enable();
-					flash_prog(rw_offset + addr, buffer, rc);
-					flash_wait();
+
+					for (int written, block_offset = 0; block_offset < rc; block_offset += written) {
+						/* Show progress */
+						fprintf(stderr, "\r\033[0Kprogramming..  %04u/%04lu", addr + block_offset, file_size);
+
+						int write_addr = rw_offset + addr + block_offset;
+						written = 256 - write_addr % 256;
+						if (block_offset + written > read_blocksize) {
+							written = read_blocksize - block_offset;
+						}
+
+						memcpy(buffer_tx, buffer_file + block_offset, written);
+
+						flash_write_enable();
+						flash_prog(write_addr, buffer_tx, written);
+						flash_wait();
+					}
+
+					if (!disable_verify && interleaved_verify) {
+						flash_start_read(rw_offset + addr);
+						flash_continue_read(buffer_flash, rc);
+						flash_wait();
+						if (memcmp(buffer_file, buffer_flash, rc)) {
+							fprintf(stderr, "Found difference between flash and file!\n");
+							jtag_error(3);
+						}
+					}
 
 				}
 
@@ -1256,23 +1288,23 @@ int main(int argc, char **argv)
 		if (read_mode) {
 
 			flash_start_read(rw_offset);
-			for (int addr = 0; addr < read_size; addr += 4096) {
-				uint8_t buffer[4096];
+			for (int addr = 0; addr < read_size; addr += read_blocksize) {
+				uint8_t buffer[read_blocksize];
 
 				/* Show progress */
-				fprintf(stderr, "\r\033[0Kreading..    %04u/%04u", addr + 4096, read_size);
+				fprintf(stderr, "\r\033[0Kreading..    %04u/%04u", addr + read_blocksize, read_size);
 
-				flash_continue_read(buffer, 4096);
-				fwrite(buffer, read_size - addr > 4096 ? 4096 : read_size - addr, 1, f);
+				flash_continue_read(buffer, read_blocksize);
+				fwrite(buffer, read_size - addr > read_blocksize ? read_blocksize : read_size - addr, 1, f);
 			}
 			fprintf(stderr, "\n");
-		} else if (!erase_mode && !disable_verify) {
+		} else if (!erase_mode && !disable_verify && !interleaved_verify) {
 			
 			flash_start_read(rw_offset);
-			for (int addr = 0; addr < file_size; addr += 4096) {
-				uint8_t buffer_flash[4096], buffer_file[4096];
+			for (int addr = 0; addr < file_size; addr += read_blocksize) {
+				uint8_t buffer_flash[read_blocksize], buffer_file[read_blocksize];
 
-				int rc = fread(buffer_file, 1, 4096, f);
+				int rc = fread(buffer_file, 1, read_blocksize, f);
 				if (rc <= 0)
 					break;
 				
