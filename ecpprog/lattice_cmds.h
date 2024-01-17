@@ -66,10 +66,12 @@ const struct device_id_pair ecp_devices[] =
 
 const struct device_id_pair nx_devices[] =
 {
-	/* Crosslink NX */
+	/* CrossLink NX */
 	{"LIFCL-17",    0x010F0043 },
 	{"LIFCL-40-ES", 0x010F1043 },
 	{"LIFCL-40",    0x110F1043 },
+	/* CrossLinkU NX */
+	{"LIFCL-33U",   0x010FB043 },
 	/* Certus NX */
 	{"LFD2NX-17",   0x310F0043 },
 	{"LFD2NX-40",   0x310F1043 },
