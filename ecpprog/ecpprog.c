@@ -449,7 +449,7 @@ static void flash_disable_protection()
 // ECP5 specific JTAG functions
 // ---------------------------------------------------------
 
-static void print_idcode(uint32_t idcode){
+static bool print_idcode(uint32_t idcode){
 	connected_device.id = idcode;
 	
 	/* ECP5 Parts */
@@ -459,7 +459,7 @@ static void print_idcode(uint32_t idcode){
 			connected_device.name = ecp_devices[i].device_name;
 			connected_device.type = TYPE_ECP5;
 			printf("IDCODE: 0x%08x (%s)\n", idcode ,ecp_devices[i].device_name);
-			return;
+			return true;
 		}
 	}
 
@@ -470,13 +470,14 @@ static void print_idcode(uint32_t idcode){
 			connected_device.name = nx_devices[i].device_name;
 			connected_device.type = TYPE_NX;
 			printf("IDCODE: 0x%08x (%s)\n", idcode ,nx_devices[i].device_name);
-			return;
+			return true;
 		}
 	}
 	printf("IDCODE: 0x%08x does not match :(\n", idcode);
+	return false;
 }
 
-static void read_idcode(){
+static bool read_idcode(){
 
 	uint8_t data[4] = {READ_ID};
 
@@ -493,7 +494,7 @@ static void read_idcode(){
 	for(int i = 0; i< 4; i++)
 		idcode = data[i] << 24 | idcode >> 8;
 
-	print_idcode(idcode);
+	return print_idcode(idcode);
 }
 
 void print_ecp5_status_register(uint32_t status){	
@@ -750,6 +751,7 @@ static void help(const char *progname)
 	fprintf(stderr, "  -v                    verbose output\n");
 	fprintf(stderr, "  -i [4,32,64]          select erase block size [default: 64k]\n");
 	fprintf(stderr, "  -a                    reinitialize the device after any operation\n");
+	fprintf(stderr, "  -z                    IDCODE read out must match known supported device\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Mode of operation:\n");
 	fprintf(stderr, "  [default]             write file contents to flash, then verify\n");
@@ -804,6 +806,7 @@ int main(int argc, char **argv)
 	int clkdiv = 1;
 
 	bool reinitialize = false;
+	bool idcode_match = false;
 	bool read_mode = false;
 	bool check_mode = false;
 	bool erase_mode = false;
@@ -830,7 +833,7 @@ int main(int argc, char **argv)
 	/* Decode command line parameters */
 	int opt;
 	char *endptr;
-	while ((opt = getopt_long(argc, argv, "d:i:I:rR:e:o:k:scabnStvpX", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "d:i:I:rR:e:o:k:scazbnStvpX", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'd': /* device string */
 			devstr = optarg;
@@ -920,6 +923,9 @@ int main(int argc, char **argv)
 			break;
 		case 'a': /* reinitialize ECP5 device reading new configuration */
 			reinitialize = true;
+			break;
+		case 'z': /* IDCODE must match known device */
+			idcode_match = true;
 			break;
 		case 'b': /* bulk erase before writing */
 			bulk_erase = true;
@@ -1095,7 +1101,12 @@ int main(int argc, char **argv)
 	fprintf(stderr, "init..\n");
 	jtag_init(ifnum, devstr, clkdiv);
 
-	read_idcode();
+	bool ok_id = read_idcode();
+	if (idcode_match && !ok_id) {
+		jtag_deinit();
+		return 1;
+	}
+
 	read_status_register();
 
 	if (test_mode)
